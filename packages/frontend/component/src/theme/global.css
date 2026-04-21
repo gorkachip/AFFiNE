@@ -27,60 +27,60 @@ body {
     sans-serif !important;
 }
 
-/* Force MOJO dark palette regardless of light/dark user choice. */
+/* MOJO light palette — earthy cream from mojodevelopments.com.
+   Force regardless of user's light/dark preference. */
 html,
 html[data-theme='light'],
 html[data-theme='dark'] {
   /* Brand & accents */
-  --affine-brand-color: #bbac9d !important;
-  --affine-primary-color: #bbac9d !important;
-  --affine-link-color: #bbac9d !important;
-  --affine-hover-color: rgba(187, 172, 157, 0.08) !important;
-  --affine-hover-color-filled: rgba(187, 172, 157, 0.16) !important;
-  --affine-active-color: rgba(187, 172, 157, 0.24) !important;
+  --affine-brand-color: #6f634f !important;
+  --affine-primary-color: #6f634f !important;
+  --affine-link-color: #49615b !important;
+  --affine-hover-color: rgba(111, 99, 79, 0.06) !important;
+  --affine-hover-color-filled: rgba(111, 99, 79, 0.12) !important;
+  --affine-active-color: rgba(111, 99, 79, 0.18) !important;
 
-  /* Backgrounds */
-  --affine-background-primary-color: #27241e !important;
-  --affine-background-secondary-color: #1c1a16 !important;
-  --affine-background-tertiary-color: #110f0e !important;
-  --affine-background-modal-color: rgba(17, 15, 14, 0.7) !important;
-  --affine-background-overlay-panel-color: #3e3723 !important;
-  --affine-background-code-block: #110f0e !important;
+  /* Backgrounds — Baby Powder canvas */
+  --affine-background-primary-color: #fcf9f6 !important;
+  --affine-background-secondary-color: #f4ede4 !important;
+  --affine-background-tertiary-color: #e5dad0 !important;
+  --affine-background-modal-color: rgba(39, 36, 30, 0.5) !important;
+  --affine-background-overlay-panel-color: #fcf9f6 !important;
+  --affine-background-code-block: #ede7df !important;
 
-  /* Text */
-  --affine-text-primary-color: #fcf9f6 !important;
-  --affine-text-secondary-color: #cbb9a5 !important;
-  --affine-text-disable-color: rgba(252, 249, 246, 0.4) !important;
-  --affine-text-emphasis-color: #bbac9d !important;
-  --affine-icon-color: #cbb9a5 !important;
-  --affine-icon-secondary: rgba(203, 185, 165, 0.65) !important;
-  --affine-placeholder-color: rgba(203, 185, 165, 0.5) !important;
+  /* Text — Eerie Black on cream */
+  --affine-text-primary-color: #27241e !important;
+  --affine-text-secondary-color: #6f634f !important;
+  --affine-text-disable-color: rgba(39, 36, 30, 0.4) !important;
+  --affine-text-emphasis-color: #49615b !important;
+  --affine-icon-color: #6f634f !important;
+  --affine-icon-secondary: rgba(111, 99, 79, 0.65) !important;
+  --affine-placeholder-color: rgba(111, 99, 79, 0.5) !important;
 
-  /* Borders & dividers */
-  --affine-border-color: #3e3723 !important;
-  --affine-divider-color: #3e3723 !important;
+  /* Borders & dividers — subtle Timberwolf */
+  --affine-border-color: #e5dad0 !important;
+  --affine-divider-color: #e5dad0 !important;
 
-  /* Status colors (kept readable on dark bg) */
-  --affine-error-color: #d57972 !important;
-  --affine-warning-color: #d4a26a !important;
-  --affine-success-color: #7fa28d !important;
-  --affine-processing-color: #6f8aa1 !important;
-  --affine-background-error-color: rgba(213, 121, 114, 0.15) !important;
-  --affine-background-warning-color: rgba(212, 162, 106, 0.15) !important;
-  --affine-background-success-color: rgba(127, 162, 141, 0.15) !important;
-  --affine-background-processing-color: rgba(111, 138, 161, 0.15) !important;
+  /* Status colors (muted earthy variants) */
+  --affine-error-color: #b15a52 !important;
+  --affine-warning-color: #b07a3c !important;
+  --affine-success-color: #49615b !important;
+  --affine-processing-color: #4a6783 !important;
+  --affine-background-error-color: rgba(177, 90, 82, 0.1) !important;
+  --affine-background-warning-color: rgba(176, 122, 60, 0.1) !important;
+  --affine-background-success-color: rgba(73, 97, 91, 0.1) !important;
+  --affine-background-processing-color: rgba(74, 103, 131, 0.1) !important;
 
-  /* Card backgrounds (used in some surfaces) */
-  --affine-card-background-blue: #2c3a3f !important;
-  --affine-card-background-green: #2e3a35 !important;
-  --affine-card-background-grey: #2a2823 !important;
+  /* Card backgrounds */
+  --affine-card-background-blue: #e8eef0 !important;
+  --affine-card-background-green: #e8efe9 !important;
+  --affine-card-background-grey: #ede7df !important;
 
-  /* Theme color (browser chrome) */
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html {
-  background-color: #27241e !important;
+  background-color: #fcf9f6 !important;
 }
 
 html,
