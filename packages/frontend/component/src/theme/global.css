@@ -8,27 +8,79 @@
   --noise-background: url(./noise.avif);
   text-autospace: normal;
 
-  /* MOJO brand palette overrides */
-  --affine-brand-color: #49615b;
-  --affine-primary-color: #49615b;
-  --affine-hover-color: rgba(73, 97, 91, 0.08);
-  --affine-link-color: #49615b;
-
   /* MOJO typography */
   --affine-font-family:
-    'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  --affine-font-sans-family:
+    'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
 }
 
 body {
   font-family:
-    'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    'DM Sans',
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif !important;
 }
 
+/* Force MOJO dark palette regardless of light/dark user choice. */
+html,
+html[data-theme='light'],
 html[data-theme='dark'] {
+  /* Brand & accents */
   --affine-brand-color: #bbac9d;
   --affine-primary-color: #bbac9d;
-  --affine-hover-color: rgba(187, 172, 157, 0.08);
   --affine-link-color: #bbac9d;
+  --affine-hover-color: rgba(187, 172, 157, 0.08);
+  --affine-hover-color-filled: rgba(187, 172, 157, 0.16);
+  --affine-active-color: rgba(187, 172, 157, 0.24);
+
+  /* Backgrounds */
+  --affine-background-primary-color: #27241e;
+  --affine-background-secondary-color: #1c1a16;
+  --affine-background-tertiary-color: #110f0e;
+  --affine-background-modal-color: rgba(17, 15, 14, 0.7);
+  --affine-background-overlay-panel-color: #3e3723;
+  --affine-background-code-block: #110f0e;
+
+  /* Text */
+  --affine-text-primary-color: #fcf9f6;
+  --affine-text-secondary-color: #cbb9a5;
+  --affine-text-disable-color: rgba(252, 249, 246, 0.4);
+  --affine-text-emphasis-color: #bbac9d;
+  --affine-icon-color: #cbb9a5;
+  --affine-icon-secondary: rgba(203, 185, 165, 0.65);
+  --affine-placeholder-color: rgba(203, 185, 165, 0.5);
+
+  /* Borders & dividers */
+  --affine-border-color: #3e3723;
+  --affine-divider-color: #3e3723;
+
+  /* Status colors (kept readable on dark bg) */
+  --affine-error-color: #d57972;
+  --affine-warning-color: #d4a26a;
+  --affine-success-color: #7fa28d;
+  --affine-processing-color: #6f8aa1;
+  --affine-background-error-color: rgba(213, 121, 114, 0.15);
+  --affine-background-warning-color: rgba(212, 162, 106, 0.15);
+  --affine-background-success-color: rgba(127, 162, 141, 0.15);
+  --affine-background-processing-color: rgba(111, 138, 161, 0.15);
+
+  /* Card backgrounds (used in some surfaces) */
+  --affine-card-background-blue: #2c3a3f;
+  --affine-card-background-green: #2e3a35;
+  --affine-card-background-grey: #2a2823;
+
+  /* Theme color (browser chrome) */
+  color-scheme: dark;
+}
+
+html {
+  background-color: #27241e;
 }
 
 html,

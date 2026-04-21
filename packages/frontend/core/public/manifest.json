@@ -3,7 +3,8 @@
   "short_name": "MOJO Notion",
   "description": "MOJO Notion — your private workspace for docs, whiteboards and databases.",
   "start_url": "/?source=pwa",
-  "background_color": "#ffffff",
+  "background_color": "#27241e",
+  "theme_color": "#27241e",
   "display": "standalone",
   "scope": "/",
   "icons": [
