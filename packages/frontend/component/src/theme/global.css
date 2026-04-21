@@ -32,55 +32,55 @@ html,
 html[data-theme='light'],
 html[data-theme='dark'] {
   /* Brand & accents */
-  --affine-brand-color: #bbac9d;
-  --affine-primary-color: #bbac9d;
-  --affine-link-color: #bbac9d;
-  --affine-hover-color: rgba(187, 172, 157, 0.08);
-  --affine-hover-color-filled: rgba(187, 172, 157, 0.16);
-  --affine-active-color: rgba(187, 172, 157, 0.24);
+  --affine-brand-color: #bbac9d !important;
+  --affine-primary-color: #bbac9d !important;
+  --affine-link-color: #bbac9d !important;
+  --affine-hover-color: rgba(187, 172, 157, 0.08) !important;
+  --affine-hover-color-filled: rgba(187, 172, 157, 0.16) !important;
+  --affine-active-color: rgba(187, 172, 157, 0.24) !important;
 
   /* Backgrounds */
-  --affine-background-primary-color: #27241e;
-  --affine-background-secondary-color: #1c1a16;
-  --affine-background-tertiary-color: #110f0e;
-  --affine-background-modal-color: rgba(17, 15, 14, 0.7);
-  --affine-background-overlay-panel-color: #3e3723;
-  --affine-background-code-block: #110f0e;
+  --affine-background-primary-color: #27241e !important;
+  --affine-background-secondary-color: #1c1a16 !important;
+  --affine-background-tertiary-color: #110f0e !important;
+  --affine-background-modal-color: rgba(17, 15, 14, 0.7) !important;
+  --affine-background-overlay-panel-color: #3e3723 !important;
+  --affine-background-code-block: #110f0e !important;
 
   /* Text */
-  --affine-text-primary-color: #fcf9f6;
-  --affine-text-secondary-color: #cbb9a5;
-  --affine-text-disable-color: rgba(252, 249, 246, 0.4);
-  --affine-text-emphasis-color: #bbac9d;
-  --affine-icon-color: #cbb9a5;
-  --affine-icon-secondary: rgba(203, 185, 165, 0.65);
-  --affine-placeholder-color: rgba(203, 185, 165, 0.5);
+  --affine-text-primary-color: #fcf9f6 !important;
+  --affine-text-secondary-color: #cbb9a5 !important;
+  --affine-text-disable-color: rgba(252, 249, 246, 0.4) !important;
+  --affine-text-emphasis-color: #bbac9d !important;
+  --affine-icon-color: #cbb9a5 !important;
+  --affine-icon-secondary: rgba(203, 185, 165, 0.65) !important;
+  --affine-placeholder-color: rgba(203, 185, 165, 0.5) !important;
 
   /* Borders & dividers */
-  --affine-border-color: #3e3723;
-  --affine-divider-color: #3e3723;
+  --affine-border-color: #3e3723 !important;
+  --affine-divider-color: #3e3723 !important;
 
   /* Status colors (kept readable on dark bg) */
-  --affine-error-color: #d57972;
-  --affine-warning-color: #d4a26a;
-  --affine-success-color: #7fa28d;
-  --affine-processing-color: #6f8aa1;
-  --affine-background-error-color: rgba(213, 121, 114, 0.15);
-  --affine-background-warning-color: rgba(212, 162, 106, 0.15);
-  --affine-background-success-color: rgba(127, 162, 141, 0.15);
-  --affine-background-processing-color: rgba(111, 138, 161, 0.15);
+  --affine-error-color: #d57972 !important;
+  --affine-warning-color: #d4a26a !important;
+  --affine-success-color: #7fa28d !important;
+  --affine-processing-color: #6f8aa1 !important;
+  --affine-background-error-color: rgba(213, 121, 114, 0.15) !important;
+  --affine-background-warning-color: rgba(212, 162, 106, 0.15) !important;
+  --affine-background-success-color: rgba(127, 162, 141, 0.15) !important;
+  --affine-background-processing-color: rgba(111, 138, 161, 0.15) !important;
 
   /* Card backgrounds (used in some surfaces) */
-  --affine-card-background-blue: #2c3a3f;
-  --affine-card-background-green: #2e3a35;
-  --affine-card-background-grey: #2a2823;
+  --affine-card-background-blue: #2c3a3f !important;
+  --affine-card-background-green: #2e3a35 !important;
+  --affine-card-background-grey: #2a2823 !important;
 
   /* Theme color (browser chrome) */
   color-scheme: dark;
 }
 
 html {
-  background-color: #27241e;
+  background-color: #27241e !important;
 }
 
 html,
