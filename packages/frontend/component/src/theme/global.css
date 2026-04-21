@@ -7,6 +7,28 @@
 :root {
   --noise-background: url(./noise.avif);
   text-autospace: normal;
+
+  /* MOJO brand palette overrides */
+  --affine-brand-color: #49615b;
+  --affine-primary-color: #49615b;
+  --affine-hover-color: rgba(73, 97, 91, 0.08);
+  --affine-link-color: #49615b;
+
+  /* MOJO typography */
+  --affine-font-family:
+    'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  font-family:
+    'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+html[data-theme='dark'] {
+  --affine-brand-color: #bbac9d;
+  --affine-primary-color: #bbac9d;
+  --affine-hover-color: rgba(187, 172, 157, 0.08);
+  --affine-link-color: #bbac9d;
 }
 
 html,

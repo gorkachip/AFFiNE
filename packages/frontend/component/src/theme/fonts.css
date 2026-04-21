@@ -1,5 +1,10 @@
 /*
- * Inter (Variable)
+ * MOJO brand fonts (Google Fonts CDN)
+ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Lacquer&display=swap');
+
+/*
+ * Inter (kept as fallback). Body uses DM Sans first via global.css override.
  */
 @font-face {
   font-family: 'Inter';

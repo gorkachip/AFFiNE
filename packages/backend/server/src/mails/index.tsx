@@ -66,14 +66,14 @@ function make<T extends ComponentType<any>>(
 
 export const Renderers = {
   //#region Test
-  TestMail: make(TestMail, 'Test Email from AFFiNE'),
+  TestMail: make(TestMail, 'Test Email from MOJO Notion'),
   //#endregion
 
   //#region User
-  SignIn: make(SignIn, 'Sign in to AFFiNE'),
-  SignUp: make(SignUp, 'Your AFFiNE account is waiting for you!'),
-  SetPassword: make(SetPassword, 'Set your AFFiNE password'),
-  ChangePassword: make(ChangePassword, 'Modify your AFFiNE password'),
+  SignIn: make(SignIn, 'Sign in to MOJO Notion'),
+  SignUp: make(SignUp, 'Your MOJO Notion account is waiting for you!'),
+  SetPassword: make(SetPassword, 'Set your MOJO Notion password'),
+  ChangePassword: make(ChangePassword, 'Modify your MOJO Notion password'),
   VerifyEmail: make(VerifyEmail, 'Verify your email address'),
   ChangeEmail: make(ChangeEmail, 'Change your email address'),
   VerifyChangeEmail: make(VerifyChangeEmail, 'Verify your new email address'),
