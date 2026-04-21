@@ -32,7 +32,7 @@ export const titleIcon = style({
 const title = style({
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  fontFamily: 'Inter',
+  fontFamily: "'DM Sans', 'Inter'",
 });
 
 export const noteTitle = style([

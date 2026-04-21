@@ -425,7 +425,7 @@ export class CodeArtifactTool extends ArtifactTool<
       gap: 4px;
       border-radius: 4px;
       color: ${unsafeCSSVarV2('text/primary')};
-      font-family: Inter;
+      font-family: 'DM Sans', Inter;
       font-size: 12px;
       font-style: normal;
       font-weight: 500;

@@ -51,7 +51,7 @@ export class MiniMindmapPreview extends WithDisposable(LitElement) {
         var(--textColor-textSecondaryColor, #8e8d91)
       );
 
-      font-family: Inter;
+      font-family: 'DM Sans', Inter;
       font-size: 12px;
       font-style: normal;
       font-weight: 500;

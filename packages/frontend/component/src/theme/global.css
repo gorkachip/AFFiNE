@@ -11,13 +11,17 @@
   /* MOJO typography */
   --affine-font-family:
     'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    sans-serif;
+    sans-serif !important;
   --affine-font-sans-family:
     'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    sans-serif;
+    sans-serif !important;
 }
 
-body {
+body,
+input,
+textarea,
+button,
+select {
   font-family:
     'DM Sans',
     'Inter',
@@ -81,6 +85,79 @@ html[data-theme='dark'] {
 
 html {
   background-color: #fcf9f6 !important;
+}
+
+/* MOJO override of AFFiNE V2 design tokens (used by sidebar, panels, etc.) */
+html,
+html[data-theme='light'],
+html[data-theme='dark'] {
+  /* Layer backgrounds — cream tones */
+  --affine-v2-layer-background-primary: #fcf9f6 !important;
+  --affine-v2-layer-background-secondary: #f4ede4 !important;
+  --affine-v2-layer-background-tertiary: #ede7df !important;
+  --affine-v2-layer-background-overlayPanel: #fcf9f6 !important;
+  --affine-v2-layer-background-codeBlock: #ede7df !important;
+  --affine-v2-layer-background-hoverOverlay: rgba(111, 99, 79, 0.06) !important;
+  --affine-v2-layer-background-modal: rgba(39, 36, 30, 0.5) !important;
+  --affine-v2-layer-background-modalWhite: rgba(252, 249, 246, 0.95) !important;
+  --affine-v2-layer-background-translucentUI: rgba(
+    252,
+    249,
+    246,
+    0.85
+  ) !important;
+  --affine-v2-layer-background-mobile-primary: #fcf9f6 !important;
+  --affine-v2-layer-background-mobile-secondary: #f4ede4 !important;
+  --affine-v2-layer-background-mobile-tertiary: #ede7df !important;
+  --affine-v2-layer-background-edgelessGrid: #e5dad0 !important;
+  --affine-v2-layer-background-linkedDocOnEdgeless: #fcf9f6 !important;
+  --affine-v2-layer-background-error: rgba(177, 90, 82, 0.1) !important;
+  --affine-v2-layer-background-success: rgba(73, 97, 91, 0.1) !important;
+  --affine-v2-layer-background-warning: rgba(176, 122, 60, 0.1) !important;
+  --affine-v2-layer-background-processing: rgba(74, 103, 131, 0.1) !important;
+  --affine-v2-layer-white: #fcf9f6 !important;
+  --affine-v2-layer-black: #27241e !important;
+  --affine-v2-layer-border: #e5dad0 !important;
+  --affine-v2-layer-insideBorder-blackBorder: rgba(39, 36, 30, 0.06) !important;
+  --affine-v2-layer-insideBorder-border: #e5dad0 !important;
+  --affine-v2-layer-insideBorder-primaryBorder: #6f634f !important;
+
+  /* Text */
+  --affine-v2-text-primary: #27241e !important;
+  --affine-v2-text-secondary: #6f634f !important;
+  --affine-v2-text-tertiary: rgba(39, 36, 30, 0.5) !important;
+  --affine-v2-text-disable: rgba(39, 36, 30, 0.35) !important;
+  --affine-v2-text-emphasis: #49615b !important;
+  --affine-v2-text-link: #49615b !important;
+  --affine-v2-text-placeholder: rgba(111, 99, 79, 0.5) !important;
+  --affine-v2-text-pureWhite: #fcf9f6 !important;
+  --affine-v2-text-purewhite: #fcf9f6 !important;
+
+  /* Icon */
+  --affine-v2-icon-primary: #6f634f !important;
+  --affine-v2-icon-secondary: rgba(111, 99, 79, 0.65) !important;
+  --affine-v2-icon-activated: #49615b !important;
+  --affine-v2-icon-disable: rgba(39, 36, 30, 0.3) !important;
+  --affine-v2-icon-monotone: #6f634f !important;
+  --affine-v2-icon-tertiary: #bbac9d !important;
+
+  /* Button */
+  --affine-v2-button-primary: #49615b !important;
+  --affine-v2-button-secondary: #f4ede4 !important;
+  --affine-v2-button-disable: rgba(39, 36, 30, 0.25) !important;
+  --affine-v2-button-buttonOverHover: rgba(111, 99, 79, 0.08) !important;
+  --affine-v2-button-iconButtonSolid: #f4ede4 !important;
+  --affine-v2-button-pureWhiteText: #fcf9f6 !important;
+  --affine-v2-button-actionActive: rgba(73, 97, 91, 0.12) !important;
+  --affine-v2-button-emptyIconBackground: rgba(111, 99, 79, 0.06) !important;
+  --affine-v2-button-innerBlackBorder: rgba(39, 36, 30, 0.08) !important;
+
+  /* Edgeless / shadows */
+  --affine-v2-edgeless-toolbarShadow: 0 4px 12px rgba(39, 36, 30, 0.08) !important;
+
+  /* Status accents on text */
+  --affine-v2-text-emphasis-color: #49615b !important;
+  --affine-v2-icon-activeColor: #49615b !important;
 }
 
 html,

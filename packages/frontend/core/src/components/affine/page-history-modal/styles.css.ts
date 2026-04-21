@@ -10,7 +10,7 @@ const previewTopOffset = createVar('preview-top-offset');
 export const root = style({
   height: '100%',
   width: '100%',
-  fontFamily: 'Inter',
+  fontFamily: "'DM Sans', 'Inter'",
   vars: {
     [headerHeight]: '52px',
     [footerHeight]: '68px',

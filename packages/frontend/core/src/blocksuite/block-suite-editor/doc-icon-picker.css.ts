@@ -11,7 +11,7 @@ export const docIconPickerTrigger = style({
       lineHeight: 1,
     },
     '&[data-icon-type="emoji"]': {
-      fontFamily: 'Inter',
+      fontFamily: "'DM Sans', 'Inter'",
     },
     '&::after': {
       display: 'none',

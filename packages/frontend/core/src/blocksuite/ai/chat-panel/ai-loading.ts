@@ -26,7 +26,7 @@ export class AILoading extends WithDisposable(LitElement) {
         flex: 1 0 0;
 
         /* light/smMedium */
-        font-family: Inter;
+        font-family: 'DM Sans', Inter;
         font-size: 14px;
         font-style: normal;
         font-weight: 500;
