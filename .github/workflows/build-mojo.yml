@@ -37,6 +37,14 @@ jobs:
         env:
           BUILD_TYPE: stable
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build native module (Rust)
+        run: yarn affine @affine/server-native build
+        env:
+          BUILD_TYPE: stable
+
       - name: Build web frontend
         run: yarn affine @affine/web build
         env:
