@@ -45,6 +45,27 @@ jobs:
         env:
           BUILD_TYPE: stable
 
+      - name: Alias native module to expected filenames
+        run: |
+          cd packages/backend/native
+          if [ -f server-native.node ]; then
+            cp server-native.node server-native.x64.node
+            cp server-native.node server-native.arm64.node
+            cp server-native.node server-native.armv7.node
+          else
+            echo "server-native.node not found; checking for other naming"
+            ls -la
+            for f in server-native.linux-x64-gnu.node server-native.linux-x64.node; do
+              if [ -f "$f" ]; then
+                cp "$f" server-native.x64.node
+                cp "$f" server-native.arm64.node
+                cp "$f" server-native.armv7.node
+                break
+              fi
+            done
+          fi
+          ls -la
+
       - name: Build web frontend
         run: yarn affine @affine/web build
         env:
