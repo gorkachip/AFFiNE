@@ -96,6 +96,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Install production dependencies for server
+        run: |
+          yarn config set --json supportedArchitectures.cpu '["x64"]'
+          yarn config set --json supportedArchitectures.libc '["glibc"]'
+          yarn workspaces focus @affine/server --production
+          # Generate Prisma client (needed at runtime)
+          yarn workspace @affine/server prisma generate
+          # Move node_modules into the server folder so the docker image picks them up
+          mv ./node_modules ./packages/backend/server/
+
       - name: Build & push Docker image
         uses: docker/build-push-action@v6
         with:
