@@ -1,4 +1,4 @@
-import { Container, Img, Link, Row, Section } from '@react-email/components';
+import { Container, Row, Section } from '@react-email/components';
 import type { CSSProperties } from 'react';
 
 import { BasicTextStyle } from './common';
@@ -22,40 +22,14 @@ export const Footer = () => {
         padding: '24px',
       }}
     >
-      <Section align="center" width="auto" style={{ margin: '1px auto' }}>
-        <Row>
-          {['Github', 'Twitter', 'Discord', 'Youtube', 'Reddit'].map(
-            platform => (
-              <td key={platform} style={{ padding: '0 10px' }}>
-                <Link href={`https://affine.pro/${platform.toLowerCase()}`}>
-                  <Img
-                    src={`https://cdn.affine.pro/mail/2023-8-9/${platform}.png`}
-                    alt={`affine ${platform.toLowerCase()} link`}
-                    height="16px"
-                  />
-                </Link>
-              </td>
-            )
-          )}
+      <Section align="center" width="auto">
+        <Row style={TextStyles}>
+          <td>Paradise. Before the world arrives.</td>
         </Row>
       </Section>
       <Section align="center" width="auto">
         <Row style={TextStyles}>
-          <td>One hyper-fused platform for wildly creative minds</td>
-        </Row>
-      </Section>
-      <Section align="center" width="auto">
-        <Row style={TextStyles}>
-          <td>Copyright</td>
-          <td>
-            <Img
-              src="https://cdn.affine.pro/mail/2023-8-9/copyright.png"
-              alt="copyright"
-              height="14px"
-              style={{ verticalAlign: 'middle', margin: '0 4px' }}
-            />
-          </td>
-          <td>2023-{new Date().getUTCFullYear()} ToEverything</td>
+          <td>© {new Date().getUTCFullYear()} MOJO Developments</td>
         </Row>
       </Section>
     </Container>

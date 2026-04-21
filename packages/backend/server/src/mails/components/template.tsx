@@ -214,11 +214,11 @@ export function Template(props: PropsWithChildren) {
           }}
         >
           <Section>
-            <Link href="https://affine.pro">
+            <Link href="https://notion.mojodevelopments.com">
               <Img
-                src="https://cdn.affine.pro/mail/2023-8-9/affine-logo.png"
-                alt="AFFiNE logo"
-                height="32px"
+                src="https://notion.mojodevelopments.com/imgs/mojo-logo.png"
+                alt="MOJO Notion logo"
+                height="40px"
               />
             </Link>
           </Section>

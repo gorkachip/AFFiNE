@@ -1,21 +1,15 @@
 import { buttonVariants } from '@affine/admin/components/ui/button';
 import { Separator } from '@affine/admin/components/ui/separator';
 import { cn } from '@affine/admin/utils';
-import {
-  AlbumIcon,
-  ChevronRightIcon,
-  GithubIcon,
-  MailWarningIcon,
-  UploadCloudIcon,
-} from 'lucide-react';
+import { ChevronRightIcon, GithubIcon, MailWarningIcon } from 'lucide-react';
 
 type Channel = 'stable' | 'canary' | 'beta' | 'internal';
 
 const appNames = {
-  stable: 'AFFiNE',
-  canary: 'AFFiNE Canary',
-  beta: 'AFFiNE Beta',
-  internal: 'AFFiNE Internal',
+  stable: 'MOJO Notion',
+  canary: 'MOJO Notion Canary',
+  beta: 'MOJO Notion Beta',
+  internal: 'MOJO Notion Internal',
 } satisfies Record<Channel, string>;
 const appName = appNames[BUILD_CONFIG.appBuildType];
 
@@ -23,22 +17,12 @@ const links = [
   {
     href: BUILD_CONFIG.githubUrl,
     icon: <GithubIcon size={20} />,
-    label: 'Star AFFiNE on GitHub',
+    label: 'View source on GitHub',
   },
   {
     href: BUILD_CONFIG.githubUrl,
     icon: <MailWarningIcon size={20} />,
     label: 'Report an Issue',
-  },
-  {
-    href: 'https://docs.affine.pro/docs/self-host-affine',
-    icon: <AlbumIcon size={20} />,
-    label: 'Self-host Document',
-  },
-  {
-    href: 'https://affine.pro/pricing/?type=selfhost#table',
-    icon: <UploadCloudIcon size={20} />,
-    label: 'Upgrade to Team',
   },
 ];
 
@@ -46,7 +30,7 @@ export function AboutAFFiNE() {
   return (
     <div className="flex flex-col h-full gap-3 py-5 px-6 w-full">
       <div className="flex items-center">
-        <span className="text-xl font-semibold">About AFFiNE</span>
+        <span className="text-xl font-semibold">About MOJO Notion</span>
       </div>
       <div className="overflow-y-auto space-y-[10px]">
         <div className="flex flex-col rounded-md border">
