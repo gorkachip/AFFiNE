@@ -6,7 +6,7 @@ export const brandHeader = style({
   justifyContent: 'center',
   gap: 8,
   padding: '0 8px 12px',
-  marginTop: -53,
+  marginTop: -42,
   marginBottom: 8,
   borderBottom: '1px solid #e5dad0',
   userSelect: 'none',
