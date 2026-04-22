@@ -5,8 +5,9 @@ export const brandHeader = style({
   alignItems: 'baseline',
   justifyContent: 'center',
   gap: 8,
-  padding: '12px 8px',
-  marginBottom: 8,
+  padding: '4px 8px 8px',
+  marginTop: -4,
+  marginBottom: 6,
   borderBottom: '1px solid #e5dad0',
   userSelect: 'none',
 });
