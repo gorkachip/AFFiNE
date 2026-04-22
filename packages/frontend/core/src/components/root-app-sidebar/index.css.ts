@@ -3,9 +3,11 @@ import { style } from '@vanilla-extract/css';
 export const brandHeader = style({
   display: 'flex',
   alignItems: 'baseline',
+  justifyContent: 'center',
   gap: 8,
-  padding: '14px 8px 12px',
-  marginBottom: 4,
+  padding: '0 8px 12px',
+  marginTop: -64,
+  marginBottom: 8,
   borderBottom: '1px solid #e5dad0',
   userSelect: 'none',
 });
