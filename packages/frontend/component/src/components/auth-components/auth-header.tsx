@@ -1,4 +1,3 @@
-import { Logo1Icon } from '@blocksuite/icons/rc';
 import clsx from 'clsx';
 import type { FC } from 'react';
 
@@ -12,7 +11,14 @@ export const AuthHeader: FC<{
   return (
     <div className={clsx(authHeaderWrapper, className)}>
       <p>
-        <Logo1Icon className="logo" />
+        <img
+          src="/imgs/mojo-logo.png"
+          alt="MOJO Notion"
+          className="logo"
+          width={28}
+          height={28}
+          style={{ objectFit: 'contain', verticalAlign: 'middle' }}
+        />
         {title}
       </p>
       <p>{subTitle}</p>
