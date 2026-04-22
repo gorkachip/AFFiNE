@@ -5,13 +5,10 @@ export const brandHeader = style({
   alignItems: 'baseline',
   justifyContent: 'center',
   gap: 8,
-  padding: '0 8px 8px',
-  marginTop: -108,
-  marginBottom: 6,
+  padding: '8px 14px 8px',
   borderBottom: '1px solid #e5dad0',
   userSelect: 'none',
-  position: 'relative',
-  zIndex: 1,
+  flexShrink: 0,
 });
 
 export const brandLogoText = style({

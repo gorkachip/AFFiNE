@@ -192,11 +192,11 @@ export const RootAppSidebar = memo((): ReactElement => {
 
   return (
     <AppSidebar>
+      <div className={brandHeader}>
+        <span className={brandLogoText}>MOJO</span>
+        <span className={brandSubtext}>Notion</span>
+      </div>
       <SidebarContainer>
-        <div className={brandHeader}>
-          <span className={brandLogoText}>MOJO</span>
-          <span className={brandSubtext}>Notion</span>
-        </div>
         <div className={workspaceAndUserWrapper}>
           <div className={workspaceWrapper}>
             <WorkspaceNavigator
