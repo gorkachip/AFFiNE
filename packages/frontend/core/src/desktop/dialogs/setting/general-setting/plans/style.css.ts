@@ -85,7 +85,7 @@ export const planCardBorderMock = style({
     borderRadius: 'inherit',
     border: `2px solid transparent`,
     // TODO(@catsjuice): brandColor with opacity, dark mode compatibility needed
-    background: `linear-gradient(180deg, ${cssVar('brandColor')}, #1E96EB33) border-box`,
+    background: `linear-gradient(180deg, ${cssVar('brandColor')}, #49615B33) border-box`,
     ['WebkitMask']: `linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)`,
     [`WebkitMaskComposite`]: `destination-out`,
     maskComposite: `exclude`,

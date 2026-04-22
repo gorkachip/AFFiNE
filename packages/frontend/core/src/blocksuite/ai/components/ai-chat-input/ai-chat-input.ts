@@ -182,7 +182,7 @@ export class AIChatInput extends SignalWatcher(
       }
 
       .chat-input-icon[data-active='true'] {
-        background-color: #1e96eb14;
+        background-color: #49615b14;
 
         svg {
           color: ${unsafeCSSVarV2('icon/activated')};

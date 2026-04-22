@@ -206,7 +206,7 @@ export const LeftPanel = ({
           </Button>
         </SheetTrigger>
         <SheetHeader className="hidden">
-          <SheetTitle>AFFiNE</SheetTitle>
+          <SheetTitle>MOJO Notion</SheetTitle>
           <SheetDescription>
             Admin panel for managing accounts, AI, config, and settings
           </SheetDescription>
@@ -265,7 +265,7 @@ export const LeftPanel = ({
           >
             <Logo />
           </span>
-          {!isCollapsed && 'AFFiNE'}
+          {!isCollapsed && 'MOJO Notion'}
         </div>
         <Nav isCollapsed={isCollapsed} />
       </div>

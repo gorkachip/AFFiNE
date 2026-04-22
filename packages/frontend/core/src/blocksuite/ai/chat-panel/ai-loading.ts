@@ -17,7 +17,7 @@ export class AILoading extends WithDisposable(LitElement) {
       align-items: center;
       gap: 8px;
 
-      color: var(--light-brandColor, #1e96eb);
+      color: var(--light-brandColor, #49615b);
 
       .text {
         display: flex;

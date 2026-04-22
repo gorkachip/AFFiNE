@@ -107,7 +107,7 @@ export const playCheckAnimation = async (refElement: Element) => {
     [
       {
         boxShadow:
-          '0 -18px 0 -8px #1e96eb, 16px -8px 0 -8px #1e96eb, 16px 8px 0 -8px #1e96eb, 0 18px 0 -8px #1e96eb, -16px 8px 0 -8px #1e96eb, -16px -8px 0 -8px #1e96eb',
+          '0 -18px 0 -8px #49615b, 16px -8px 0 -8px #49615b, 16px 8px 0 -8px #49615b, 0 18px 0 -8px #49615b, -16px 8px 0 -8px #49615b, -16px -8px 0 -8px #49615b',
       },
     ],
     { duration: 240, easing: 'ease', fill: 'forwards' }
