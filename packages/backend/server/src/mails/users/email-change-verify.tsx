@@ -11,8 +11,9 @@ export default function VerifyChangeEmail(props: VerifyChangeEmailProps) {
       <Content>
         <P>
           You recently requested to change the email address associated with
-          your AFFiNE account. To complete this process, please click on the
-          verification link below. This magic link will expire in 30 minutes.
+          your MOJO Notion account. To complete this process, please click on
+          the verification link below. This magic link will expire in 30
+          minutes.
         </P>
         <Button href={props.url}>Verify your new email address</Button>
       </Content>

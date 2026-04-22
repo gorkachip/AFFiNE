@@ -58,7 +58,7 @@ export const EnableCloudPanel = ({
         onClick={confirmEnableCloudAndClose}
         style={{ marginTop: '12px' }}
       >
-        {t['Enable AFFiNE Cloud']()}
+        {t['Enable MOJO Notion Cloud']()}
       </Button>
     </SettingRow>
   );

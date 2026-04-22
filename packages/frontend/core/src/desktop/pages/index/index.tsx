@@ -75,7 +75,11 @@ export const Component = ({
     if (createOnceRef.current) return;
     createOnceRef.current = true;
     // TODO: support selfhosted
-    buildShowcaseWorkspace(workspacesService, 'affine-cloud', 'AFFiNE Cloud')
+    buildShowcaseWorkspace(
+      workspacesService,
+      'affine-cloud',
+      'MOJO Notion Cloud'
+    )
       .then(({ meta, defaultDocId }) => {
         if (defaultDocId) {
           jumpToPage(meta.id, defaultDocId);

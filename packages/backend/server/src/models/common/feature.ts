@@ -110,11 +110,11 @@ const ProFeature = {
   type: FeatureType.Quota,
   configs: {
     name: 'Pro',
-    blobLimit: 100 * OneMB,
-    storageQuota: 100 * OneGB,
-    historyPeriod: 30 * OneDay,
-    memberLimit: 10,
-    copilotActionLimit: 10,
+    blobLimit: 500 * OneMB,
+    storageQuota: 1024 * OneGB,
+    historyPeriod: 365 * OneDay,
+    memberLimit: 999_999,
+    copilotActionLimit: 100,
   },
 } as const;
 
@@ -122,11 +122,11 @@ const LifetimeProFeature = {
   type: FeatureType.Quota,
   configs: {
     name: 'Lifetime Pro',
-    blobLimit: 100 * OneMB,
+    blobLimit: 500 * OneMB,
     storageQuota: 1024 * OneGB,
-    historyPeriod: 30 * OneDay,
-    memberLimit: 10,
-    copilotActionLimit: 10,
+    historyPeriod: 365 * OneDay,
+    memberLimit: 999_999,
+    copilotActionLimit: 100,
   },
 } as const;
 

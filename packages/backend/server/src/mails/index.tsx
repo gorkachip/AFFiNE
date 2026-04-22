@@ -177,7 +177,7 @@ export const Renderers = {
   //#region License
   TeamLicense: make(
     TeamLicense,
-    'Your AFFiNE Self-Hosted Team Workspace license is ready'
+    'Your MOJO Notion Self-Hosted Team Workspace license is ready'
   ),
   //#endregion
 } as const;

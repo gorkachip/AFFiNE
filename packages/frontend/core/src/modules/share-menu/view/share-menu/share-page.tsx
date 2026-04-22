@@ -38,7 +38,7 @@ export const LocalSharePage = (props: ShareMenuProps) => {
               variant="primary"
               data-testid="share-menu-enable-affine-cloud-button"
             >
-              {t['Enable AFFiNE Cloud']()}
+              {t['Enable MOJO Notion Cloud']()}
             </Button>
           </div>
         </div>
