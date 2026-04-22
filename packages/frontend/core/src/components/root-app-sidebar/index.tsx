@@ -41,6 +41,9 @@ import { WorkbenchService } from '../../modules/workbench';
 import { WorkspaceNavigator } from '../workspace-selector';
 import {
   bottomContainer,
+  brandHeader,
+  brandLogoText,
+  brandSubtext,
   quickSearch,
   quickSearchAndNewPage,
   workspaceAndUserWrapper,
@@ -190,6 +193,10 @@ export const RootAppSidebar = memo((): ReactElement => {
   return (
     <AppSidebar>
       <SidebarContainer>
+        <div className={brandHeader}>
+          <span className={brandLogoText}>MOJO</span>
+          <span className={brandSubtext}>Notion</span>
+        </div>
         <div className={workspaceAndUserWrapper}>
           <div className={workspaceWrapper}>
             <WorkspaceNavigator

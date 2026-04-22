@@ -1,5 +1,33 @@
 import { style } from '@vanilla-extract/css';
 
+export const brandHeader = style({
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 8,
+  padding: '14px 8px 12px',
+  marginBottom: 4,
+  borderBottom: '1px solid #e5dad0',
+  userSelect: 'none',
+});
+
+export const brandLogoText = style({
+  fontFamily: "'Lacquer', cursive",
+  fontSize: '32px',
+  lineHeight: 1,
+  color: '#27241e',
+  letterSpacing: '0.5px',
+});
+
+export const brandSubtext = style({
+  fontFamily: "'DM Sans', sans-serif",
+  fontSize: '10px',
+  fontWeight: 600,
+  letterSpacing: '2px',
+  textTransform: 'uppercase',
+  color: '#6f634f',
+  opacity: 0.7,
+});
+
 export const workspaceAndUserWrapper = style({
   display: 'flex',
   alignItems: 'center',
