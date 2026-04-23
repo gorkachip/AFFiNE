@@ -95,14 +95,18 @@ export const FolderShareDialog = ({
 
   const handleSave = useCallback(() => {
     if (mode === 'public') {
-      folder.setVisibility(undefined);
+      // Write an explicit empty string so the ORM overwrites any prior
+      // 'restricted' JSON. parseVisibility() treats '' as public.
+      folder.setVisibility('');
     } else {
       // Always include the current user as a safety net.
       const users = new Set(selectedUsers);
       if (currentUserId) users.add(currentUserId);
-      folder.setVisibility(
-        serializeVisibility({ mode: 'restricted', users: Array.from(users) })
-      );
+      const serialized = serializeVisibility({
+        mode: 'restricted',
+        users: Array.from(users),
+      });
+      folder.setVisibility(serialized ?? '');
     }
     onOpenChange(false);
   }, [folder, mode, onOpenChange, selectedUsers, currentUserId]);

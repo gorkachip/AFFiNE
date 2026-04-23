@@ -130,7 +130,7 @@ export class FolderNode extends Entity<{
     this.store.renameNode(this.id, name);
   }
 
-  setVisibility(visibility: string | undefined) {
+  setVisibility(visibility: string) {
     if (this.id === null) {
       throw new Error('Cannot set visibility on root node');
     }

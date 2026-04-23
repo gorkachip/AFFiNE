@@ -123,13 +123,15 @@ export class FolderStore extends Store {
     this.dbService.db.folders.delete(linkId);
   }
 
-  setVisibility(folderId: string, visibility: string | undefined) {
+  setVisibility(folderId: string, visibility: string) {
     const node = this.dbService.db.folders.get(folderId);
     if (node === null || node.type !== 'folder') {
       throw new Error('Folder not found');
     }
+    // Always pass a string (possibly empty) so the ORM overwrites any prior
+    // value. Passing undefined would be treated as "no change".
     this.dbService.db.folders.update(folderId, {
-      visibility,
+      visibility: visibility,
     });
   }
 
