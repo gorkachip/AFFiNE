@@ -19,6 +19,12 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     data: f.string(),
     type: f.string(),
     index: f.string(),
+    /**
+     * MOJO folder visibility (optional; undefined = public).
+     * JSON encoded: `{ "mode": "public" | "restricted", "users": [userId, ...] }`
+     * UI-level filter only (data still syncs via Yjs to all clients).
+     */
+    visibility: f.string().optional(),
   },
   docProperties: t.document({
     // { [`custom:{customPropertyId}`]: any }
