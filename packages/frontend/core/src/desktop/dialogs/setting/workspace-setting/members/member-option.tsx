@@ -2,11 +2,10 @@ import { MenuItem, notify, useConfirmModal } from '@affine/component';
 import {
   type Member,
   WorkspaceMembersService,
-  WorkspacePermissionService,
 } from '@affine/core/modules/permissions';
 import { Permission, WorkspaceMemberStatus } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
-import { useLiveData, useService } from '@toeverything/infra';
+import { useService } from '@toeverything/infra';
 import { useCallback, useMemo } from 'react';
 
 export const MemberOptions = ({
@@ -24,8 +23,6 @@ export const MemberOptions = ({
 }) => {
   const t = useI18n();
   const membersService = useService(WorkspaceMembersService);
-  const permission = useService(WorkspacePermissionService).permission;
-  const isTeam = useLiveData(permission.isTeam$);
   const { openConfirmModal } = useConfirmModal();
 
   const openRemoveConfirmModal = useCallback(
@@ -249,7 +246,6 @@ export const MemberOptions = ({
         label: t['com.affine.payment.member.team.change.admin'](),
         onClick: handleChangeToAdmin,
         show:
-          isTeam &&
           isOwner &&
           member.permission !== Permission.Owner &&
           member.permission !== Permission.Admin &&
@@ -272,7 +268,6 @@ export const MemberOptions = ({
     handleRevoke,
     isAdmin,
     isOwner,
-    isTeam,
     member.permission,
     member.status,
     t,

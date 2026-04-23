@@ -691,17 +691,21 @@ const NavigationPanelFolderNodeFolder = ({
           </IconButton>
         ),
       },
-      {
-        index: 99,
-        view: (
-          <MenuItem
-            prefixIcon={<ShareIcon />}
-            onClick={() => setShareOpen(true)}
-          >
-            Share folder
-          </MenuItem>
-        ),
-      },
+      ...(isOwnerOrAdmin
+        ? [
+            {
+              index: 99,
+              view: (
+                <MenuItem
+                  prefixIcon={<ShareIcon />}
+                  onClick={() => setShareOpen(true)}
+                >
+                  Share folder
+                </MenuItem>
+              ),
+            },
+          ]
+        : []),
       {
         index: 100,
         view: (
@@ -779,6 +783,7 @@ const NavigationPanelFolderNodeFolder = ({
     handleCreateSubfolder,
     handleDelete,
     handleNewDoc,
+    isOwnerOrAdmin,
     node,
     t,
   ]);
