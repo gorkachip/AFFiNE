@@ -15,7 +15,6 @@ import {
 import { nanoid } from 'nanoid';
 
 import {
-  ActionForbiddenOnNonTeamWorkspace,
   AlreadyInSpace,
   AuthenticationRequired,
   Cache,
@@ -392,12 +391,8 @@ export class WorkspaceMemberResolver {
     if (newRole === WorkspaceRole.Owner) {
       await this.models.workspaceUser.setOwner(workspaceId, userId);
     } else {
-      // non-team workspace can only transfer ownership, but no detailed permission control
-      const isTeam = await this.workspaceService.isTeamWorkspace(workspaceId);
-      if (!isTeam) {
-        throw new ActionForbiddenOnNonTeamWorkspace();
-      }
-
+      // MOJO fork: allow Admin/Collaborator role assignment on any workspace
+      // (upstream AFFiNE gates this behind a Team license).
       await this.models.workspaceUser.set(workspaceId, userId, newRole);
     }
 
