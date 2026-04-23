@@ -690,6 +690,17 @@ const NavigationPanelFolderNodeFolder = ({
   );
 
   const folderOperations = useMemo(() => {
+    // MOJO: collaborators who did not create this folder (and are not
+    // workspace owner/admin) can only view it. Hide add/rename/delete
+    // operations so they cannot modify someone else's folder.
+    if (!canManage) {
+      return [
+        {
+          index: 200,
+          view: node.id ? <FavoriteFolderOperation id={node.id} /> : null,
+        },
+      ];
+    }
     return [
       {
         index: 0,
@@ -706,21 +717,17 @@ const NavigationPanelFolderNodeFolder = ({
           </IconButton>
         ),
       },
-      ...(canManage
-        ? [
-            {
-              index: 99,
-              view: (
-                <MenuItem
-                  prefixIcon={<ShareIcon />}
-                  onClick={() => setShareOpen(true)}
-                >
-                  Share folder
-                </MenuItem>
-              ),
-            },
-          ]
-        : []),
+      {
+        index: 99,
+        view: (
+          <MenuItem
+            prefixIcon={<ShareIcon />}
+            onClick={() => setShareOpen(true)}
+          >
+            Share folder
+          </MenuItem>
+        ),
+      },
       {
         index: 100,
         view: (
@@ -812,6 +819,12 @@ const NavigationPanelFolderNodeFolder = ({
 
   const childrenOperations = useCallback(
     (type: string, node: FolderNode) => {
+      // MOJO: only the folder creator (or a workspace admin/owner) can
+      // "Remove from folder" items under a folder. Collaborators who did
+      // not create the folder cannot mutate its contents.
+      if (!canManage) {
+        return [] satisfies NodeOperation[];
+      }
       if (type === 'doc' || type === 'collection' || type === 'tag') {
         return [
           {
@@ -832,7 +845,7 @@ const NavigationPanelFolderNodeFolder = ({
       }
       return [];
     },
-    [t]
+    [canManage, t]
   );
 
   const handleCollapsedChange = useCallback(
@@ -857,23 +870,23 @@ const NavigationPanelFolderNodeFolder = ({
         icon={NavigationPanelFolderIcon}
         name={name}
         dndData={dndData}
-        onDrop={handleDropOnFolder}
+        onDrop={canManage ? handleDropOnFolder : undefined}
         defaultRenaming={defaultRenaming}
-        renameable
+        renameable={canManage}
         extractEmojiAsIcon={enableEmojiIcon}
-        reorderable={reorderable}
+        reorderable={canManage && reorderable}
         collapsed={collapsed}
         setCollapsed={handleCollapsedChange}
-        onRename={handleRename}
+        onRename={canManage ? handleRename : undefined}
         operations={finalOperations}
-        canDrop={handleCanDrop}
+        canDrop={canManage ? handleCanDrop : undefined}
         childrenPlaceholder={
           <FolderEmpty
-            canDrop={handleCanDrop}
-            onDrop={handleDropOnPlaceholder}
+            canDrop={canManage ? handleCanDrop : undefined}
+            onDrop={canManage ? handleDropOnPlaceholder : undefined}
           />
         }
-        dropEffect={handleDropEffect}
+        dropEffect={canManage ? handleDropEffect : undefined}
         data-testid={`navigation-panel-folder-${node.id}`}
         explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
       >
