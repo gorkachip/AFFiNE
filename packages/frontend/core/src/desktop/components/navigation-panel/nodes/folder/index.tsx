@@ -30,12 +30,14 @@ import {
   PlusIcon,
   PlusThickIcon,
   RemoveFolderIcon,
+  ShareIcon,
   TagsIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
 import { difference } from 'lodash-es';
 import { useCallback, useMemo, useState } from 'react';
 
+import { FolderShareDialog } from '../../../../../components/folder-share-dialog';
 import {
   NavigationPanelTreeNode,
   type NavigationPanelTreeNodeDropEffect,
@@ -213,6 +215,7 @@ const NavigationPanelFolderNodeFolder = ({
     [navigationPanelService, path]
   );
   const [newFolderId, setNewFolderId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { createPage } = usePageHelper(
     workspaceService.workspace.docCollection
@@ -667,6 +670,17 @@ const NavigationPanelFolderNodeFolder = ({
         ),
       },
       {
+        index: 99,
+        view: (
+          <MenuItem
+            prefixIcon={<ShareIcon />}
+            onClick={() => setShareOpen(true)}
+          >
+            Share folder
+          </MenuItem>
+        ),
+      },
+      {
         index: 100,
         view: (
           <MenuItem prefixIcon={<FolderIcon />} onClick={handleCreateSubfolder}>
@@ -792,43 +806,53 @@ const NavigationPanelFolderNodeFolder = ({
   );
 
   return (
-    <NavigationPanelTreeNode
-      icon={NavigationPanelFolderIcon}
-      name={name}
-      dndData={dndData}
-      onDrop={handleDropOnFolder}
-      defaultRenaming={defaultRenaming}
-      renameable
-      extractEmojiAsIcon={enableEmojiIcon}
-      reorderable={reorderable}
-      collapsed={collapsed}
-      setCollapsed={handleCollapsedChange}
-      onRename={handleRename}
-      operations={finalOperations}
-      canDrop={handleCanDrop}
-      childrenPlaceholder={
-        <FolderEmpty canDrop={handleCanDrop} onDrop={handleDropOnPlaceholder} />
-      }
-      dropEffect={handleDropEffect}
-      data-testid={`navigation-panel-folder-${node.id}`}
-      explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
-    >
-      {children.map(child => (
-        <NavigationPanelFolderNode
-          key={child.id}
-          nodeId={child.id as string}
-          defaultRenaming={child.id === newFolderId}
-          onDrop={handleDropOnChildren}
-          operations={childrenOperations}
-          dropEffect={handleDropEffectOnChildren}
-          canDrop={handleChildrenCanDrop}
-          location={{
-            at: 'navigation-panel:organize:folder-node',
-            nodeId: child.id as string,
-          }}
-          parentPath={path}
-        />
-      ))}
-    </NavigationPanelTreeNode>
+    <>
+      <NavigationPanelTreeNode
+        icon={NavigationPanelFolderIcon}
+        name={name}
+        dndData={dndData}
+        onDrop={handleDropOnFolder}
+        defaultRenaming={defaultRenaming}
+        renameable
+        extractEmojiAsIcon={enableEmojiIcon}
+        reorderable={reorderable}
+        collapsed={collapsed}
+        setCollapsed={handleCollapsedChange}
+        onRename={handleRename}
+        operations={finalOperations}
+        canDrop={handleCanDrop}
+        childrenPlaceholder={
+          <FolderEmpty
+            canDrop={handleCanDrop}
+            onDrop={handleDropOnPlaceholder}
+          />
+        }
+        dropEffect={handleDropEffect}
+        data-testid={`navigation-panel-folder-${node.id}`}
+        explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
+      >
+        {children.map(child => (
+          <NavigationPanelFolderNode
+            key={child.id}
+            nodeId={child.id as string}
+            defaultRenaming={child.id === newFolderId}
+            onDrop={handleDropOnChildren}
+            operations={childrenOperations}
+            dropEffect={handleDropEffectOnChildren}
+            canDrop={handleChildrenCanDrop}
+            location={{
+              at: 'navigation-panel:organize:folder-node',
+              nodeId: child.id as string,
+            }}
+            parentPath={path}
+          />
+        ))}
+      </NavigationPanelTreeNode>
+      <FolderShareDialog
+        folder={node}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+      />
+    </>
   );
 };
