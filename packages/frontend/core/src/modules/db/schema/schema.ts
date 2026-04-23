@@ -25,6 +25,12 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
      * UI-level filter only (data still syncs via Yjs to all clients).
      */
     visibility: f.string().optional(),
+    /**
+     * MOJO: user ID of the account that created this folder.
+     * Collaborators can manage visibility on folders they created even
+     * though they are not workspace admins.
+     */
+    createdBy: f.string().optional(),
   },
   docProperties: t.document({
     // { [`custom:{customPropertyId}`]: any }

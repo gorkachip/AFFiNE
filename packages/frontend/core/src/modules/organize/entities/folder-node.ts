@@ -19,6 +19,7 @@ export class FolderNode extends Entity<{
     id: string;
     parentId?: string | null;
     visibility?: string | null;
+    createdBy?: string | null;
   } | null>(this.store.watchNodeInfo(this.id ?? ''), null);
   type$ = this.info$.map(info =>
     this.id === null ? 'folder' : (info?.type ?? '')
@@ -26,6 +27,7 @@ export class FolderNode extends Entity<{
   data$ = this.info$.map(info => info?.data);
   name$ = this.info$.map(info => (info?.type === 'folder' ? info.data : ''));
   visibility$ = this.info$.map(info => info?.visibility ?? null);
+  createdBy$ = this.info$.map(info => info?.createdBy ?? null);
   children$ = LiveData.from<FolderNode[]>(
     // watch children if this is a folder, otherwise return empty array
     this.type$.pipe(
@@ -87,11 +89,11 @@ export class FolderNode extends Entity<{
     return true;
   }
 
-  createFolder(name: string, index: string) {
+  createFolder(name: string, index: string, createdBy?: string) {
     if (this.type$.value !== 'folder') {
       throw new Error('Cannot create folder on non-folder node');
     }
-    return this.store.createFolder(this.id, name, index);
+    return this.store.createFolder(this.id, name, index, createdBy);
   }
 
   createLink(

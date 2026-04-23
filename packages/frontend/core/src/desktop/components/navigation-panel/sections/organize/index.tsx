@@ -4,6 +4,7 @@ import {
   IconButton,
   toast,
 } from '@affine/component';
+import { AuthService } from '@affine/core/modules/cloud';
 import { NavigationPanelService } from '@affine/core/modules/navigation-panel';
 import {
   type FolderNode,
@@ -23,10 +24,14 @@ import { organizeChildrenDropEffect } from './dnd';
 import { RootEmpty } from './empty';
 
 export const NavigationPanelOrganize = () => {
-  const { organizeService, navigationPanelService } = useServices({
+  const { organizeService, navigationPanelService, authService } = useServices({
     OrganizeService,
     NavigationPanelService,
+    AuthService,
   });
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? undefined)
+  );
   const path = useMemo(() => ['organize'], []);
   const collapsed = useLiveData(navigationPanelService.collapsed$(path));
   const [newFolderId, setNewFolderId] = useState<string | null>(null);
@@ -45,13 +50,14 @@ export const NavigationPanelOrganize = () => {
   const handleCreateFolder = useCallback(() => {
     const newFolderId = rootFolder.createFolder(
       'New Folder',
-      rootFolder.indexAt('before')
+      rootFolder.indexAt('before'),
+      currentUserId
     );
     track.$.navigationPanel.organize.createOrganizeItem({ type: 'folder' });
     setNewFolderId(newFolderId);
     navigationPanelService.setCollapsed(path, false);
     return newFolderId;
-  }, [navigationPanelService, path, rootFolder]);
+  }, [currentUserId, navigationPanelService, path, rootFolder]);
 
   const handleOnChildrenDrop = useCallback(
     (data: DropTargetDropEvent<AffineDNDData>, node?: FolderNode) => {

@@ -76,7 +76,12 @@ export class FolderStore extends Store {
     });
   }
 
-  createFolder(parentId: string | null, name: string, index: string) {
+  createFolder(
+    parentId: string | null,
+    name: string,
+    index: string,
+    createdBy?: string
+  ) {
     if (parentId) {
       const parent = this.dbService.db.folders.get(parentId);
       if (parent === null || parent.type !== 'folder') {
@@ -89,6 +94,7 @@ export class FolderStore extends Store {
       type: 'folder',
       data: name,
       index: index,
+      createdBy,
     }).id;
   }
 

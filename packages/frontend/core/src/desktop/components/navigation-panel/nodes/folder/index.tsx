@@ -212,6 +212,7 @@ const NavigationPanelFolderNodeFolder = ({
   const navigationPanelService = useService(NavigationPanelService);
   const name = useLiveData(node.name$);
   const visibilityRaw = useLiveData(node.visibility$);
+  const createdBy = useLiveData(node.createdBy$);
   const currentUserId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
   );
@@ -222,6 +223,11 @@ const NavigationPanelFolderNodeFolder = ({
     const v = parseVisibility(visibilityRaw);
     return canUserSeeFolder(v, currentUserId, !!isOwnerOrAdmin);
   }, [visibilityRaw, currentUserId, isOwnerOrAdmin]);
+  const isCreator =
+    !!currentUserId && !!createdBy && createdBy === currentUserId;
+  // Creator, owners and admins can manage this folder (share visibility +
+  // delete it). Regular collaborators can only touch folders they created.
+  const canManage = isCreator || !!isOwnerOrAdmin;
   const enableEmojiIcon = useLiveData(
     featureFlagService.flags.enable_emoji_folder_icon.$
   );
@@ -243,6 +249,14 @@ const NavigationPanelFolderNodeFolder = ({
     workspaceService.workspace.docCollection
   );
   const handleDelete = useCallback(() => {
+    if (!canManage) {
+      notify.error({
+        title: 'Cannot delete this folder',
+        message:
+          'Only the creator or a workspace admin can delete this folder. Ask an admin to remove it.',
+      });
+      return;
+    }
     node.delete();
     track.$.navigationPanel.organize.deleteOrganizeItem({
       type: 'folder',
@@ -253,7 +267,7 @@ const NavigationPanelFolderNodeFolder = ({
       }),
       message: t['com.affine.rootAppSidebar.organize.delete.notify-message'](),
     });
-  }, [name, node, t]);
+  }, [canManage, name, node, t]);
 
   const children = useLiveData(node.sortedChildren$);
 
@@ -623,12 +637,13 @@ const NavigationPanelFolderNodeFolder = ({
   const handleCreateSubfolder = useCallback(() => {
     const newFolderId = node.createFolder(
       t['com.affine.rootAppSidebar.organize.new-folders'](),
-      node.indexAt('before')
+      node.indexAt('before'),
+      currentUserId ?? undefined
     );
     track.$.navigationPanel.organize.createOrganizeItem({ type: 'folder' });
     setCollapsed(false);
     setNewFolderId(newFolderId);
-  }, [node, setCollapsed, t]);
+  }, [currentUserId, node, setCollapsed, t]);
 
   const handleAddToFolder = useCallback(
     (type: 'doc' | 'collection' | 'tag') => {
@@ -691,7 +706,7 @@ const NavigationPanelFolderNodeFolder = ({
           </IconButton>
         ),
       },
-      ...(isOwnerOrAdmin
+      ...(canManage
         ? [
             {
               index: 99,
@@ -783,7 +798,7 @@ const NavigationPanelFolderNodeFolder = ({
     handleCreateSubfolder,
     handleDelete,
     handleNewDoc,
-    isOwnerOrAdmin,
+    canManage,
     node,
     t,
   ]);
