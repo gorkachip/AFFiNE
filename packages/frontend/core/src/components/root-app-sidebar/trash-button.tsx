@@ -7,7 +7,10 @@ import {
 import { MenuLinkItem } from '@affine/core/modules/app-sidebar/views';
 import { DocsService } from '@affine/core/modules/doc';
 import { GlobalContextService } from '@affine/core/modules/global-context';
-import { GuardService } from '@affine/core/modules/permissions';
+import {
+  GuardService,
+  WorkspacePermissionService,
+} from '@affine/core/modules/permissions';
 import type { AffineDNDData } from '@affine/core/types/dnd';
 import { UserFriendlyError } from '@affine/error';
 import { useI18n } from '@affine/i18n';
@@ -20,6 +23,12 @@ export const TrashButton = () => {
   const globalContextService = useService(GlobalContextService);
   const trashActive = useLiveData(globalContextService.globalContext.isTrash.$);
   const guardService = useService(GuardService);
+  // MOJO: hide Trash entirely from collaborators so they can't permanently
+  // wipe documents. Only owners and admins can access it.
+  const workspacePermissionService = useService(WorkspacePermissionService);
+  const isOwnerOrAdmin = useLiveData(
+    workspacePermissionService.permission.isOwnerOrAdmin$
+  );
 
   const { dropTargetRef, draggedOver } = useDropTarget<AffineDNDData>(
     () => ({
@@ -72,6 +81,10 @@ export const TrashButton = () => {
     }),
     [docsService.list, guardService, openConfirmModal, t]
   );
+
+  if (!isOwnerOrAdmin) {
+    return null;
+  }
 
   return (
     <MenuLinkItem

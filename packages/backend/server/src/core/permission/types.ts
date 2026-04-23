@@ -137,12 +137,12 @@ export const RoleActionsMap = {
       return [...this[DocRole.Reader], Action.Doc.Comments.Create];
     },
     get [DocRole.Editor]() {
+      // MOJO: Editor can edit but cannot trash/delete. Only Manager (admin)
+      // and Owner (creator) can trash/delete docs. This prevents regular
+      // collaborators from wiping documents they did not create.
       return [
         ...this[DocRole.Reader],
         ...this[DocRole.Commenter],
-        Action.Doc.Trash,
-        Action.Doc.Restore,
-        Action.Doc.Delete,
         Action.Doc.Properties.Update,
         Action.Doc.Update,
         Action.Doc.Comments.Resolve,
@@ -152,6 +152,9 @@ export const RoleActionsMap = {
     get [DocRole.Manager]() {
       return [
         ...this[DocRole.Editor],
+        Action.Doc.Trash,
+        Action.Doc.Restore,
+        Action.Doc.Delete,
         Action.Doc.Publish,
         Action.Doc.Users.Manage,
       ];
