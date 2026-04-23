@@ -18,12 +18,14 @@ export class FolderNode extends Entity<{
     index: string;
     id: string;
     parentId?: string | null;
+    visibility?: string | null;
   } | null>(this.store.watchNodeInfo(this.id ?? ''), null);
   type$ = this.info$.map(info =>
     this.id === null ? 'folder' : (info?.type ?? '')
   );
   data$ = this.info$.map(info => info?.data);
   name$ = this.info$.map(info => (info?.type === 'folder' ? info.data : ''));
+  visibility$ = this.info$.map(info => info?.visibility ?? null);
   children$ = LiveData.from<FolderNode[]>(
     // watch children if this is a folder, otherwise return empty array
     this.type$.pipe(
@@ -126,6 +128,16 @@ export class FolderNode extends Entity<{
       throw new Error('Cannot rename root node');
     }
     this.store.renameNode(this.id, name);
+  }
+
+  setVisibility(visibility: string | undefined) {
+    if (this.id === null) {
+      throw new Error('Cannot set visibility on root node');
+    }
+    if (this.type$.value !== 'folder') {
+      throw new Error('Cannot set visibility on non-folder node');
+    }
+    this.store.setVisibility(this.id, visibility);
   }
 
   indexAt(at: 'before' | 'after', targetId?: string) {

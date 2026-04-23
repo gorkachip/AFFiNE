@@ -123,6 +123,16 @@ export class FolderStore extends Store {
     this.dbService.db.folders.delete(linkId);
   }
 
+  setVisibility(folderId: string, visibility: string | undefined) {
+    const node = this.dbService.db.folders.get(folderId);
+    if (node === null || node.type !== 'folder') {
+      throw new Error('Folder not found');
+    }
+    this.dbService.db.folders.update(folderId, {
+      visibility,
+    });
+  }
+
   moveNode(nodeId: string, parentId: string | null, index: string) {
     const node = this.dbService.db.folders.get(nodeId);
     if (node === null) {

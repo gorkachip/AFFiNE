@@ -4,10 +4,13 @@ import {
   IconButton,
   toast,
 } from '@affine/component';
+import { AuthService } from '@affine/core/modules/cloud';
 import { NavigationPanelService } from '@affine/core/modules/navigation-panel';
 import {
+  canUserSeeFolder,
   type FolderNode,
   OrganizeService,
+  parseVisibility,
 } from '@affine/core/modules/organize';
 import type { AffineDNDData } from '@affine/core/types/dnd';
 import { useI18n } from '@affine/i18n';
@@ -23,19 +26,37 @@ import { organizeChildrenDropEffect } from './dnd';
 import { RootEmpty } from './empty';
 
 export const NavigationPanelOrganize = () => {
-  const { organizeService, navigationPanelService } = useServices({
+  const { organizeService, navigationPanelService, authService } = useServices({
     OrganizeService,
     NavigationPanelService,
+    AuthService,
   });
   const path = useMemo(() => ['organize'], []);
   const collapsed = useLiveData(navigationPanelService.collapsed$(path));
   const [newFolderId, setNewFolderId] = useState<string | null>(null);
   const t = useI18n();
 
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+
   const folderTree = organizeService.folderTree;
   const rootFolder = folderTree.rootFolder;
 
-  const folders = useLiveData(rootFolder.sortedChildren$);
+  const allFolders = useLiveData(rootFolder.sortedChildren$);
+  // MOJO folder visibility: filter out folders the current user is not allowed to see.
+  // Read each folder's visibility$ via useLiveData inside the map to react to changes.
+  const folders = useMemo(
+    () =>
+      allFolders.filter(child => {
+        const visibility = parseVisibility(child.visibility$.value);
+        // Workspace owner/admin escalation is not yet wired in the sidebar; for
+        // now treat the current user as a regular member. Owners can still
+        // manage by accessing the workspace settings panel directly.
+        return canUserSeeFolder(visibility, currentUserId, false);
+      }),
+    [allFolders, currentUserId]
+  );
   const isLoading = useLiveData(folderTree.isLoading$);
 
   const handleCreateFolder = useCallback(() => {
