@@ -4,13 +4,10 @@ import {
   IconButton,
   toast,
 } from '@affine/component';
-import { AuthService } from '@affine/core/modules/cloud';
 import { NavigationPanelService } from '@affine/core/modules/navigation-panel';
 import {
-  canUserSeeFolder,
   type FolderNode,
   OrganizeService,
-  parseVisibility,
 } from '@affine/core/modules/organize';
 import type { AffineDNDData } from '@affine/core/types/dnd';
 import { useI18n } from '@affine/i18n';
@@ -26,37 +23,23 @@ import { organizeChildrenDropEffect } from './dnd';
 import { RootEmpty } from './empty';
 
 export const NavigationPanelOrganize = () => {
-  const { organizeService, navigationPanelService, authService } = useServices({
+  const { organizeService, navigationPanelService } = useServices({
     OrganizeService,
     NavigationPanelService,
-    AuthService,
   });
   const path = useMemo(() => ['organize'], []);
   const collapsed = useLiveData(navigationPanelService.collapsed$(path));
   const [newFolderId, setNewFolderId] = useState<string | null>(null);
   const t = useI18n();
 
-  const currentUserId = useLiveData(
-    authService.session.account$.map(a => a?.id ?? null)
-  );
-
   const folderTree = organizeService.folderTree;
   const rootFolder = folderTree.rootFolder;
 
-  const allFolders = useLiveData(rootFolder.sortedChildren$);
-  // MOJO folder visibility: filter out folders the current user is not allowed to see.
-  // Read each folder's visibility$ via useLiveData inside the map to react to changes.
-  const folders = useMemo(
-    () =>
-      allFolders.filter(child => {
-        const visibility = parseVisibility(child.visibility$.value);
-        // Workspace owner/admin escalation is not yet wired in the sidebar; for
-        // now treat the current user as a regular member. Owners can still
-        // manage by accessing the workspace settings panel directly.
-        return canUserSeeFolder(visibility, currentUserId, false);
-      }),
-    [allFolders, currentUserId]
-  );
+  // Render all folders; each NavigationPanelFolderNode self-filters based on
+  // visibility$ + currentUserId (returns null if the current user is not in
+  // the allow list). This keeps reactivity correct without violating React
+  // hook rules in the parent.
+  const folders = useLiveData(rootFolder.sortedChildren$);
   const isLoading = useLiveData(folderTree.isLoading$);
 
   const handleCreateFolder = useCallback(() => {

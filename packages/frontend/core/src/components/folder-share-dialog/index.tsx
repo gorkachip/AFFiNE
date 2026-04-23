@@ -1,4 +1,5 @@
 import { Button, Modal, RadioGroup } from '@affine/component';
+import { AuthService } from '@affine/core/modules/cloud';
 import type { FolderNode } from '@affine/core/modules/organize';
 import {
   parseVisibility,
@@ -14,11 +15,27 @@ interface FolderShareDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const checkboxStyle = {
+  WebkitAppearance: 'checkbox',
+  MozAppearance: 'checkbox',
+  appearance: 'checkbox',
+  width: '16px',
+  height: '16px',
+  cursor: 'pointer',
+  flexShrink: 0,
+} as const;
+
 /**
  * MOJO folder visibility dialog. Lets the workspace decide whether a folder
  * shows for everyone or only a chosen subset of workspace members.
  *
  * Phase 1: UI-only filter. Data still syncs to all clients via Yjs.
+ *
+ * Safety nets:
+ * - On save in 'restricted' mode, automatically include the current user's ID
+ *   so they can't lock themselves out of folders they own.
+ * - Checkboxes use forced appearance: checkbox to override the global
+ *   `-webkit-appearance: none` reset on inputs.
  */
 export const FolderShareDialog = ({
   folder,
@@ -26,10 +43,14 @@ export const FolderShareDialog = ({
   onOpenChange,
 }: FolderShareDialogProps) => {
   const membersService = useService(WorkspaceMembersService);
+  const authService = useService(AuthService);
   const members = membersService.members;
   const pageMembers = useLiveData(members.pageMembers$);
   const memberCount = useLiveData(members.memberCount$);
   const isLoading = useLiveData(members.isLoading$);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
 
   const folderName = useLiveData(folder.name$);
   const visibilityRaw = useLiveData(folder.visibility$);
@@ -45,38 +66,53 @@ export const FolderShareDialog = ({
 
   useEffect(() => {
     if (open) {
+      // Default: include current user so they always see the folder.
+      const seed = new Set(initial.users);
+      if (currentUserId) seed.add(currentUserId);
       setMode(initial.mode);
-      setSelectedUsers(new Set(initial.users));
-      // Walk pages to gather all members. PAGE_SIZE = 8 in entity.
+      setSelectedUsers(seed);
       members.setPageNum(0);
       members.revalidate();
     }
-  }, [open, initial.mode, initial.users, members]);
+  }, [open, initial.mode, initial.users, members, currentUserId]);
 
-  const toggleUser = useCallback((userId: string) => {
-    setSelectedUsers(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
-  }, []);
+  const toggleUser = useCallback(
+    (userId: string) => {
+      setSelectedUsers(prev => {
+        const next = new Set(prev);
+        if (next.has(userId)) {
+          // Don't allow user to remove themselves — they would lose access.
+          if (userId === currentUserId) return prev;
+          next.delete(userId);
+        } else {
+          next.add(userId);
+        }
+        return next;
+      });
+    },
+    [currentUserId]
+  );
 
   const handleSave = useCallback(() => {
-    const next =
-      mode === 'public'
-        ? undefined
-        : serializeVisibility({ mode, users: Array.from(selectedUsers) });
-    folder.setVisibility(next);
+    if (mode === 'public') {
+      folder.setVisibility(undefined);
+    } else {
+      // Always include the current user as a safety net.
+      const users = new Set(selectedUsers);
+      if (currentUserId) users.add(currentUserId);
+      folder.setVisibility(
+        serializeVisibility({ mode: 'restricted', users: Array.from(users) })
+      );
+    }
     onOpenChange(false);
-  }, [folder, mode, onOpenChange, selectedUsers]);
+  }, [folder, mode, onOpenChange, selectedUsers, currentUserId]);
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title={`Share folder: ${folderName ?? ''}`}
-      description="Choose who can see this folder. Sub-docs will follow the folder's visibility."
+      description="Choose who can see this folder. You will always see folders you share."
       width={520}
     >
       <div style={{ padding: '8px 0 16px' }}>
@@ -104,25 +140,35 @@ export const FolderShareDialog = ({
           {isLoading && !pageMembers ? (
             <div style={{ padding: 16, textAlign: 'center' }}>Loading…</div>
           ) : pageMembers && pageMembers.length > 0 ? (
-            pageMembers.map(m => (
-              <label
-                key={m.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '8px 6px',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedUsers.has(m.id)}
-                  onChange={() => toggleUser(m.id)}
-                />
-                <span>{m.name ?? m.email ?? m.id}</span>
-              </label>
-            ))
+            pageMembers.map(m => {
+              const isSelf = m.id === currentUserId;
+              return (
+                <label
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '8px 6px',
+                    cursor: isSelf ? 'not-allowed' : 'pointer',
+                    opacity: isSelf ? 0.7 : 1,
+                  }}
+                  title={isSelf ? 'You always have access' : ''}
+                >
+                  <input
+                    type="checkbox"
+                    style={checkboxStyle}
+                    checked={selectedUsers.has(m.id)}
+                    disabled={isSelf}
+                    onChange={() => toggleUser(m.id)}
+                  />
+                  <span>
+                    {m.name ?? m.email ?? m.id}
+                    {isSelf ? ' (you)' : ''}
+                  </span>
+                </label>
+              );
+            })
           ) : (
             <div style={{ padding: 16, textAlign: 'center' }}>
               No members loaded.
@@ -139,8 +185,8 @@ export const FolderShareDialog = ({
                   paddingTop: 8,
                 }}
               >
-                Showing {pageMembers.length} of {memberCount}. Use admin Members
-                panel to manage larger workspaces.
+                Showing {pageMembers.length} of {memberCount}. Use the admin
+                Members panel to manage larger workspaces.
               </div>
             )}
         </div>

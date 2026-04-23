@@ -10,14 +10,18 @@ import {
   notify,
 } from '@affine/component';
 import { usePageHelper } from '@affine/core/blocksuite/block-suite-page-list/utils';
+import { AuthService } from '@affine/core/modules/cloud';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
 import { NavigationPanelService } from '@affine/core/modules/navigation-panel';
 import {
+  canUserSeeFolder,
   type FolderNode,
   OrganizeService,
+  parseVisibility,
 } from '@affine/core/modules/organize';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import type { AffineDNDData } from '@affine/core/types/dnd';
 import { Unreachable } from '@affine/env/constant';
@@ -191,15 +195,33 @@ const NavigationPanelFolderNodeFolder = ({
   node: FolderNode;
 } & GenericNavigationPanelNode) => {
   const t = useI18n();
-  const { workspaceService, featureFlagService, workspaceDialogService } =
-    useServices({
-      WorkspaceService,
-      CompatibleFavoriteItemsAdapter,
-      FeatureFlagService,
-      WorkspaceDialogService,
-    });
+  const {
+    workspaceService,
+    featureFlagService,
+    workspaceDialogService,
+    authService,
+    workspacePermissionService,
+  } = useServices({
+    WorkspaceService,
+    CompatibleFavoriteItemsAdapter,
+    FeatureFlagService,
+    WorkspaceDialogService,
+    AuthService,
+    WorkspacePermissionService,
+  });
   const navigationPanelService = useService(NavigationPanelService);
   const name = useLiveData(node.name$);
+  const visibilityRaw = useLiveData(node.visibility$);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+  const isOwnerOrAdmin = useLiveData(
+    workspacePermissionService.permission.isOwnerOrAdmin$
+  );
+  const visible = useMemo(() => {
+    const v = parseVisibility(visibilityRaw);
+    return canUserSeeFolder(v, currentUserId, !!isOwnerOrAdmin);
+  }, [visibilityRaw, currentUserId, isOwnerOrAdmin]);
   const enableEmojiIcon = useLiveData(
     featureFlagService.flags.enable_emoji_folder_icon.$
   );
@@ -804,6 +826,10 @@ const NavigationPanelFolderNodeFolder = ({
     },
     [setCollapsed]
   );
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <>
