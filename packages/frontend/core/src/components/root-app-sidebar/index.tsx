@@ -1,7 +1,6 @@
 // Import is already correct, no changes needed
 import {
   AddPageButton,
-  AppDownloadButton,
   AppSidebar,
   MenuItem,
   MenuLinkItem,
@@ -262,7 +261,8 @@ export const RootAppSidebar = memo((): ReactElement => {
       </SidebarScrollableContainer>
       <SidebarContainer className={bottomContainer}>
         <SidebarAudioPlayer />
-        {BUILD_CONFIG.isElectron ? <UpdaterButton /> : <AppDownloadButton />}
+        {/* MOJO: no desktop app build, hide the download CTA in web. */}
+        {BUILD_CONFIG.isElectron ? <UpdaterButton /> : null}
       </SidebarContainer>
     </AppSidebar>
   );

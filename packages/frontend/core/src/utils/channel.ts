@@ -26,11 +26,13 @@ export const channelToScheme = {
   internal: 'affine-internal',
 } as Record<Channel, Scheme>;
 
+// MOJO: all channels use the same MOJO logo. We don't ship desktop app
+// variants for the MOJO fork.
 export const appIconMap = {
-  stable: '/imgs/app-icon-stable.ico',
-  canary: '/imgs/app-icon-canary.ico',
-  beta: '/imgs/app-icon-beta.ico',
-  internal: '/imgs/app-icon-internal.ico',
+  stable: '/imgs/mojo-logo.png',
+  canary: '/imgs/mojo-logo.png',
+  beta: '/imgs/mojo-logo.png',
+  internal: '/imgs/mojo-logo.png',
 } satisfies Record<Channel, string>;
 
 export const appNames = {
