@@ -1,5 +1,6 @@
 import { Popover, uniReactRoot } from '@affine/component';
 import {
+  type ActivityLogDocContext,
   parseValue,
   useActivityLogPanel,
 } from '@affine/core/components/workspace-property-types/activity-log-shared';
@@ -8,6 +9,7 @@ import {
   type CellRenderProps,
   createIcon,
   type DataViewCellLifeCycle,
+  EditorHostKey,
 } from '@blocksuite/affine/blocks/database';
 import { CommentIcon } from '@blocksuite/icons/rc';
 import { computed, type ReadonlySignal } from '@preact/signals-core';
@@ -27,6 +29,7 @@ class ActivityLogManager {
   private readonly cell: Cell<string, string, {}>;
   readonly selectCurrentCell: (editing: boolean) => void;
   readonly isEditing: ReadonlySignal<boolean>;
+  readonly docContext: ActivityLogDocContext;
 
   value = computed(() => this.cell.value$.value ?? '');
 
@@ -38,6 +41,17 @@ class ActivityLogManager {
     this.cell = props.cell;
     this.selectCurrentCell = props.selectCurrentCell;
     this.isEditing = props.isEditing$;
+    const host = this.cell.view.serviceGet(EditorHostKey);
+    const store = host?.std.store;
+    const docId = store?.id ?? '';
+    const title =
+      (docId && store?.workspace.meta.getDocMeta(docId)?.title) || 'Untitled';
+    // BlockSuite database/kanban blocks only render in page-mode docs.
+    this.docContext = {
+      id: docId,
+      title,
+      mode: 'page' as ActivityLogDocContext['mode'],
+    };
   }
 
   setValue = (next: string): void => {
@@ -74,7 +88,8 @@ const ActivityLogCellComponent: ForwardRefRenderFunction<
   const { entryCount, lastEntry, popoverBody } = useActivityLogPanel(
     value,
     manager.setValue,
-    readonlyVal
+    readonlyVal,
+    manager.docContext
   );
 
   const lastLabel = lastEntry ? `${entryCount}` : '—';

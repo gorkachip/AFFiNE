@@ -1,9 +1,9 @@
 import { AuthService } from '@affine/core/modules/cloud';
-import { DocService } from '@affine/core/modules/doc';
 import { NotificationService } from '@affine/core/modules/notification';
 import { WorkspaceMembersService } from '@affine/core/modules/permissions';
 import type { Member } from '@affine/core/modules/permissions/entities/members';
 import { WorkspaceService } from '@affine/core/modules/workspace';
+import type { DocMode } from '@affine/graphql';
 import { DeleteIcon as TrashIcon, EditIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { nanoid } from 'nanoid';
@@ -136,27 +136,36 @@ interface UseActivityLogResult {
   popoverBody: ReactNode;
 }
 
+export interface ActivityLogDocContext {
+  id: string;
+  title: string;
+  mode: DocMode;
+}
+
 /**
  * All Activity Log state + UI rendering, surface-agnostic. Returns trigger
  * summary fields + the popover JSX so callers can wrap them in their own
  * trigger element / popover container (PropertyValue + Menu in the workspace
  * sidebar; a small cell + Popover in the BlockSuite database-block kanban).
+ *
+ * The doc context (id/title/mode) must be provided by the caller. The
+ * workspace-property surface lives inside DocScope and resolves it via
+ * DocService; the BlockSuite cell is mounted from a uniReactRoot that lives
+ * outside DocScope, so it has to pull the doc info from the BlockSuite host.
  */
 export function useActivityLogPanel(
   value: string | undefined,
   onChange: (next: string) => void,
-  readonly?: boolean
+  readonly: boolean | undefined,
+  docContext: ActivityLogDocContext
 ): UseActivityLogResult {
   const authService = useService(AuthService);
   const membersService = useService(WorkspaceMembersService);
-  const docService = useService(DocService);
   const workspaceService = useService(WorkspaceService);
   const notificationService = useService(NotificationService);
   const account = useLiveData(authService.session.account$);
   const rawMembers = useLiveData(membersService.members.pageMembers$);
   const members = useMemo<Member[]>(() => rawMembers ?? [], [rawMembers]);
-  const docTitle = useLiveData(docService.doc.record.title$);
-  const docMode = useLiveData(docService.doc.record.primaryMode$);
   const isCloud = workspaceService.workspace.flavour !== 'local';
 
   const notifyMentions = useCallback(
@@ -164,9 +173,9 @@ export function useActivityLogPanel(
       if (!isCloud || !account) return;
       const workspaceId = workspaceService.workspace.id;
       const doc = {
-        id: docService.doc.id,
-        title: docTitle || 'Untitled',
-        mode: docMode,
+        id: docContext.id,
+        title: docContext.title || 'Untitled',
+        mode: docContext.mode,
       };
       for (const userId of recipients) {
         if (userId === account.id) continue;
@@ -179,9 +188,9 @@ export function useActivityLogPanel(
       isCloud,
       account,
       workspaceService,
-      docService,
-      docTitle,
-      docMode,
+      docContext.id,
+      docContext.title,
+      docContext.mode,
       notificationService,
     ]
   );

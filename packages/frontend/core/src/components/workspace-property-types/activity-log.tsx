@@ -1,6 +1,8 @@
 import { Menu, PropertyValue, Tooltip } from '@affine/component';
+import { DocService } from '@affine/core/modules/doc';
 import { CommentIcon } from '@blocksuite/icons/rc';
-import { useState } from 'react';
+import { useLiveData, useService } from '@toeverything/infra';
+import { useMemo, useState } from 'react';
 
 import { PlainTextDocGroupHeader } from '../explorer/docs-view/group-header';
 import { StackProperty } from '../explorer/docs-view/stack-property';
@@ -8,6 +10,7 @@ import type { DocListPropertyProps, GroupHeaderProps } from '../explorer/types';
 import type { PropertyValueProps } from '../properties/types';
 import * as styles from './activity-log.css';
 import {
+  type ActivityLogDocContext,
   formatRelativeTime,
   parseValue,
   useActivityLogPanel,
@@ -19,10 +22,22 @@ export const ActivityLogValueRenderer = ({
   readonly,
 }: PropertyValueProps) => {
   const [open, setOpen] = useState(false);
+  const docService = useService(DocService);
+  const docTitle = useLiveData(docService.doc.record.title$);
+  const docMode = useLiveData(docService.doc.record.primaryMode$);
+  const docContext = useMemo<ActivityLogDocContext>(
+    () => ({
+      id: docService.doc.id,
+      title: docTitle || 'Untitled',
+      mode: docMode,
+    }),
+    [docService.doc.id, docTitle, docMode]
+  );
   const { entryCount, triggerSnippet, popoverBody } = useActivityLogPanel(
     value,
     onChange,
-    readonly
+    readonly,
+    docContext
   );
 
   return (
