@@ -1,4 +1,5 @@
 import { LiveData, Service } from '@toeverything/infra';
+import { map } from 'rxjs';
 
 import type { WorkspaceDBService } from '../../db';
 
@@ -64,16 +65,18 @@ export class DeadlineIndexService extends Service {
   }
 
   deadlines$ = LiveData.from<DeadlineEntry[]>(
-    this.db.db.deadlines.find$({}).map(rows =>
-      rows.map(row => ({
-        id: row.id,
-        docId: row.docId ?? '',
-        rowId: row.rowId ?? '',
-        deadline: Number(row.deadline ?? 0),
-        createdBy: row.createdBy ?? undefined,
-        memberIds: row.memberIds ? safeParseArray(row.memberIds) : [],
-        title: row.title ?? '',
-      }))
+    this.db.db.deadlines.find$({}).pipe(
+      map(rows =>
+        rows.map(row => ({
+          id: row.id,
+          docId: row.docId ?? '',
+          rowId: row.rowId ?? '',
+          deadline: Number(row.deadline ?? 0),
+          createdBy: row.createdBy ?? undefined,
+          memberIds: row.memberIds ? safeParseArray(row.memberIds) : [],
+          title: row.title ?? '',
+        }))
+      )
     ),
     []
   );
