@@ -31,6 +31,14 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
      * though they are not workspace admins.
      */
     createdBy: f.string().optional(),
+    /** MOJO: soft-delete flag for folders. Trashed folders are hidden
+     *  from the sidebar tree and surfaced in the Trash page. */
+    trashed: f.boolean().optional(),
+    /** MOJO: user ID that trashed the folder. Used to filter the
+     *  per-collaborator Trash view. */
+    trashedBy: f.string().optional(),
+    /** MOJO: timestamp the folder was trashed. */
+    trashedAt: f.number().optional(),
   },
   docProperties: t.document({
     // { [`custom:{customPropertyId}`]: any }

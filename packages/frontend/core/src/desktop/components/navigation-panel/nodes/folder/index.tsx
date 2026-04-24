@@ -176,6 +176,7 @@ function hasVisibleDescendant(
 ): boolean {
   for (const child of node.children$.value) {
     if (child.type$.value !== 'folder') continue;
+    if (child.trashed$.value) continue;
     const v = parseVisibility(child.visibility$.value);
     if (canUserSeeFolder(v, userId, isOwnerOrAdmin)) return true;
     if (hasVisibleDescendant(child, userId, isOwnerOrAdmin)) return true;
@@ -231,6 +232,9 @@ const NavigationPanelFolderNodeFolder = ({
   const name = useLiveData(node.name$);
   const visibilityRaw = useLiveData(node.visibility$);
   const createdBy = useLiveData(node.createdBy$);
+  // MOJO: trashed folders are filtered out of the sidebar tree; they
+  // surface in the dedicated Trash page instead.
+  const trashed = useLiveData(node.trashed$);
   const currentUserId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
   );
@@ -907,6 +911,9 @@ const NavigationPanelFolderNodeFolder = ({
     [setCollapsed]
   );
 
+  if (trashed) {
+    return null;
+  }
   if (!visible && !passthrough) {
     return null;
   }

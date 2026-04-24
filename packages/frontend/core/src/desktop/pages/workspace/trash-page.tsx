@@ -10,11 +10,15 @@ import { AuthService } from '@affine/core/modules/cloud';
 import { CollectionRulesService } from '@affine/core/modules/collection-rules';
 import { DocsService } from '@affine/core/modules/doc';
 import { GlobalContextService } from '@affine/core/modules/global-context';
+import {
+  type FolderNode,
+  OrganizeService,
+} from '@affine/core/modules/organize';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { useI18n } from '@affine/i18n';
-import { DeleteIcon } from '@blocksuite/icons/rc';
+import { DeleteIcon, FolderIcon, ResetIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   useIsActiveView,
@@ -200,6 +204,20 @@ export const TrashPage = () => {
     return;
   }, [globalContextService.globalContext.isTrash, isActiveView]);
 
+  // MOJO: also surface trashed folders alongside the docs trash. Each
+  // user sees their own; admins/owners see them all.
+  const organizeService = useService(OrganizeService);
+  const allTrashedFolders = useLiveData(
+    organizeService.folderTree.trashedFolders$
+  );
+  const trashedFolders = useMemo(() => {
+    if (isAdmin || isOwner) return allTrashedFolders;
+    if (!currentUserId) return [];
+    return allTrashedFolders.filter(f => f.trashedBy$.value === currentUserId);
+  }, [allTrashedFolders, isAdmin, isOwner, currentUserId]);
+
+  const showFoldersSection = trashedFolders.length > 0;
+
   return (
     <DocExplorerContext.Provider value={explorerContextValue}>
       <ViewTitle title={t['Trash']()} />
@@ -209,7 +227,13 @@ export const TrashPage = () => {
       </ViewHeader>
       <ViewBody>
         <div className={styles.body}>
-          {isEmpty ? (
+          {showFoldersSection && (
+            <TrashedFoldersSection
+              folders={trashedFolders}
+              canPermaDelete={isAdmin || isOwner}
+            />
+          )}
+          {isEmpty && !showFoldersSection ? (
             <EmptyPageList type="trash" />
           ) : (
             <DocsExplorer
@@ -223,6 +247,69 @@ export const TrashPage = () => {
         </div>
       </ViewBody>
     </DocExplorerContext.Provider>
+  );
+};
+
+// MOJO: per-user (or per-admin) list of soft-deleted folders. Each row
+// has Restore + Delete forever (admins only).
+const TrashedFoldersSection = ({
+  folders,
+  canPermaDelete,
+}: {
+  folders: FolderNode[];
+  canPermaDelete: boolean;
+}) => {
+  return (
+    <div className={styles.trashedFoldersSection}>
+      <div className={styles.trashedFoldersHeader}>Folders in trash</div>
+      <ul className={styles.trashedFoldersList}>
+        {folders.map(folder => (
+          <TrashedFolderRow
+            key={folder.id ?? ''}
+            folder={folder}
+            canPermaDelete={canPermaDelete}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const TrashedFolderRow = ({
+  folder,
+  canPermaDelete,
+}: {
+  folder: FolderNode;
+  canPermaDelete: boolean;
+}) => {
+  const name = useLiveData(folder.name$);
+  const trashedAt = useLiveData(folder.trashedAt$);
+  return (
+    <li className={styles.trashedFolderRow}>
+      <FolderIcon className={styles.trashedFolderIcon} />
+      <span className={styles.trashedFolderName}>{name || 'Untitled'}</span>
+      {trashedAt && (
+        <span className={styles.trashedFolderTime}>
+          {new Date(trashedAt).toLocaleString()}
+        </span>
+      )}
+      <button
+        className={styles.trashedFolderAction}
+        onClick={() => folder.restoreFromTrash()}
+        title="Restore"
+      >
+        <ResetIcon /> Restore
+      </button>
+      {canPermaDelete && (
+        <button
+          className={styles.trashedFolderActionDanger}
+          onClick={() => folder.permanentlyDelete()}
+          title="Delete forever"
+        >
+          <DeleteIcon /> Delete forever
+        </button>
+      )}
+    </li>
   );
 };
 

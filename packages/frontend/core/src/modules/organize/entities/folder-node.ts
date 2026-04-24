@@ -20,6 +20,9 @@ export class FolderNode extends Entity<{
     parentId?: string | null;
     visibility?: string | null;
     createdBy?: string | null;
+    trashed?: boolean | null;
+    trashedBy?: string | null;
+    trashedAt?: number | null;
   } | null>(this.store.watchNodeInfo(this.id ?? ''), null);
   type$ = this.info$.map(info =>
     this.id === null ? 'folder' : (info?.type ?? '')
@@ -28,6 +31,9 @@ export class FolderNode extends Entity<{
   name$ = this.info$.map(info => (info?.type === 'folder' ? info.data : ''));
   visibility$ = this.info$.map(info => info?.visibility ?? null);
   createdBy$ = this.info$.map(info => info?.createdBy ?? null);
+  trashed$ = this.info$.map(info => info?.trashed ?? false);
+  trashedBy$ = this.info$.map(info => info?.trashedBy ?? null);
+  trashedAt$ = this.info$.map(info => info?.trashedAt ?? null);
   children$ = LiveData.from<FolderNode[]>(
     // watch children if this is a folder, otherwise return empty array
     this.type$.pipe(
@@ -111,6 +117,39 @@ export class FolderNode extends Entity<{
   }
 
   delete() {
+    if (this.id === null) {
+      throw new Error('Cannot delete root node');
+    }
+    if (this.type$.value === 'folder') {
+      // MOJO: soft-delete folders so they can be restored from the Trash.
+      // Link nodes (docs/tags/collections inside a folder) keep the
+      // original hard-remove behaviour — they're just pointers, and the
+      // underlying doc has its own trash.
+      const auth = (
+        globalThis as unknown as {
+          __mojoAuthContext?: {
+            userId: string | null;
+            isOwnerOrAdmin: boolean;
+          };
+        }
+      ).__mojoAuthContext;
+      this.store.trashFolder(this.id, auth?.userId ?? null);
+    } else {
+      this.store.removeLink(this.id);
+    }
+  }
+
+  restoreFromTrash() {
+    if (this.id === null) {
+      throw new Error('Cannot restore root node');
+    }
+    if (this.type$.value !== 'folder') {
+      throw new Error('Only folders have a trash state');
+    }
+    this.store.restoreFolder(this.id);
+  }
+
+  permanentlyDelete() {
     if (this.id === null) {
       throw new Error('Cannot delete root node');
     }

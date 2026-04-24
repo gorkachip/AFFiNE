@@ -17,6 +17,15 @@ export class FolderStore extends Store {
     });
   }
 
+  // MOJO: stream every folder row currently flagged trashed=true. Used
+  // by the Trash page to show soft-deleted folders alongside docs.
+  watchTrashedFolders() {
+    return this.dbService.db.folders.find$({
+      type: 'folder',
+      trashed: true,
+    });
+  }
+
   watchIsLoading() {
     return this.dbService.db.folders.isLoading$;
   }
@@ -119,6 +128,34 @@ export class FolderStore extends Store {
         this.dbService.db.folders.delete(current.id);
       }
     }
+  }
+
+  // MOJO: soft-delete — the folder row stays in the db with trashed=true so
+  // the creator or an admin can restore it later from the sidebar Trash.
+  trashFolder(folderId: string, trashedBy: string | null) {
+    const info = this.dbService.db.folders.get(folderId);
+    if (info === null || info.type !== 'folder') {
+      throw new Error('Folder not found');
+    }
+    this.dbService.db.folders.update(folderId, {
+      trashed: true,
+      trashedBy: trashedBy ?? undefined,
+      trashedAt: Date.now(),
+    });
+  }
+
+  // MOJO: clear the soft-delete flags. Restored folders reappear in the
+  // sidebar under their original parent.
+  restoreFolder(folderId: string) {
+    const info = this.dbService.db.folders.get(folderId);
+    if (info === null || info.type !== 'folder') {
+      throw new Error('Folder not found');
+    }
+    this.dbService.db.folders.update(folderId, {
+      trashed: false,
+      trashedBy: undefined,
+      trashedAt: undefined,
+    });
   }
 
   removeLink(linkId: string) {

@@ -31,4 +31,19 @@ export class FolderTree extends Entity {
       null
     );
   }
+
+  // MOJO: every soft-deleted folder, materialised as FolderNode entities
+  // so the Trash page can show their names + restore/delete actions.
+  trashedFolders$ = LiveData.from<FolderNode[]>(
+    this.folderStore
+      .watchTrashedFolders()
+      .pipe(
+        map(rows =>
+          rows.map(row =>
+            this.framework.createEntity(FolderNode, { id: row.id })
+          )
+        )
+      ),
+    []
+  );
 }
