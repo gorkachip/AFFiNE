@@ -70,6 +70,18 @@ function getMojoAuth(): MojoAuthContext | undefined {
     .__mojoAuthContext;
 }
 
+// MOJO: read the meta:trashed flag through the prop's reactive signal
+// when available so any computed that depends on it re-runs on changes.
+function isRowTrashed(model: ParagraphBlockModel): boolean {
+  const trashedSignal = (
+    model.props as unknown as {
+      'meta:trashed$'?: { value: unknown };
+    }
+  )['meta:trashed$'];
+  if (trashedSignal) return !!trashedSignal.value;
+  return !!model.props['meta:trashed'];
+}
+
 export class DatabaseBlockDataSource extends DataSourceBase {
   override get parentProvider() {
     return this._model.store.provider;
@@ -200,21 +212,18 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   });
 
   rows$: ReadonlySignal<string[]> = computed(() => {
+    // Read each child's meta:trashed signal so this computed re-runs when a
+    // row gets soft-trashed or restored. Reading model.children alone only
+    // tracks add/remove of children, not prop mutations on them.
     return this._model.children
-      .filter(v => {
-        const props = (v as ParagraphBlockModel).props;
-        return !props['meta:trashed'];
-      })
+      .filter(v => !isRowTrashed(v as ParagraphBlockModel))
       .map(v => v.id);
   });
 
   // MOJO: trashed rows surfaced to the per-kanban Trash UI for admins.
   trashedRows$: ReadonlySignal<string[]> = computed(() => {
     return this._model.children
-      .filter(v => {
-        const props = (v as ParagraphBlockModel).props;
-        return !!props['meta:trashed'];
-      })
+      .filter(v => isRowTrashed(v as ParagraphBlockModel))
       .map(v => v.id);
   });
 
