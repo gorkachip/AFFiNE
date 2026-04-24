@@ -75,6 +75,19 @@ import { currentViewStorage } from './utils/current-view.js';
 import { getSingleDocIdFromText } from './utils/title-doc.js';
 import type { DatabaseViewExtensionOptions } from './view';
 
+// MOJO: short relative-time string for the per-kanban Trash entries.
+function formatTrashAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < minute) return 'just now';
+  if (diff < hour) return `${Math.floor(diff / minute)}m ago`;
+  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+  if (diff < 30 * day) return `${Math.floor(diff / day)}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
 export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBlockModel> {
   private readonly clickDatabaseOps = (e: MouseEvent) => {
     const options = this.optionsConfig.configure(this.model, {
@@ -131,39 +144,83 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
           const ds = this.dataSource.value;
           const trashedIds = ds.trashedRows$.value;
           if (trashedIds.length === 0) return [];
+          // Newest-trashed first so admins see the most recent mistakes
+          // at the top.
+          const sorted = [...trashedIds].sort((a, b) => {
+            const ta = (
+              ds.doc.getBlock(a)?.model as
+                | { props?: { 'meta:trashedAt'?: number } }
+                | undefined
+            )?.props?.['meta:trashedAt'];
+            const tb = (
+              ds.doc.getBlock(b)?.model as
+                | { props?: { 'meta:trashedAt'?: number } }
+                | undefined
+            )?.props?.['meta:trashedAt'];
+            return (tb ?? 0) - (ta ?? 0);
+          });
           return [
             menu.subMenu({
-              name: `Trash (${trashedIds.length})`,
+              name: `Trash (${sorted.length})`,
               prefix: DeleteIcon(),
               options: {
-                items: trashedIds.map(rowId => {
-                  const block = ds.doc.getBlock(rowId);
-                  const text =
-                    block?.model.text?.toString().trim() ||
-                    `Row ${rowId.slice(0, 6)}`;
-                  return menu.subMenu({
-                    name: text.length > 40 ? `${text.slice(0, 40)}…` : text,
-                    options: {
-                      items: [
-                        menu.action({
-                          prefix: ResetIcon(),
-                          name: 'Restore',
-                          select: () => {
-                            ds.rowRestore([rowId]);
-                          },
-                        }),
-                        menu.action({
-                          prefix: DeleteIcon(),
-                          class: { 'delete-item': true },
-                          name: 'Delete forever',
-                          select: () => {
-                            ds.rowPermaDelete([rowId]);
-                          },
-                        }),
-                      ],
-                    },
-                  });
-                }),
+                items: [
+                  menu.group({
+                    items: [
+                      menu.action({
+                        prefix: ResetIcon(),
+                        name: 'Restore all',
+                        select: () => {
+                          ds.rowRestore([...sorted]);
+                        },
+                      }),
+                      menu.action({
+                        prefix: DeleteIcon(),
+                        class: { 'delete-item': true },
+                        name: 'Empty trash',
+                        select: () => {
+                          ds.rowPermaDelete([...sorted]);
+                        },
+                      }),
+                    ],
+                  }),
+                  ...sorted.map(rowId => {
+                    const model = ds.doc.getBlock(rowId)?.model as
+                      | {
+                          text?: { toString(): string };
+                          props?: { 'meta:trashedAt'?: number };
+                        }
+                      | undefined;
+                    const text =
+                      model?.text?.toString().trim() ||
+                      `Row ${rowId.slice(0, 6)}`;
+                    const trashedAt = model?.props?.['meta:trashedAt'];
+                    const ago = trashedAt ? formatTrashAgo(trashedAt) : '';
+                    const label = `${text.length > 36 ? `${text.slice(0, 36)}…` : text}${ago ? `  ·  ${ago}` : ''}`;
+                    return menu.subMenu({
+                      name: label,
+                      options: {
+                        items: [
+                          menu.action({
+                            prefix: ResetIcon(),
+                            name: 'Restore',
+                            select: () => {
+                              ds.rowRestore([rowId]);
+                            },
+                          }),
+                          menu.action({
+                            prefix: DeleteIcon(),
+                            class: { 'delete-item': true },
+                            name: 'Delete forever',
+                            select: () => {
+                              ds.rowPermaDelete([rowId]);
+                            },
+                          }),
+                        ],
+                      },
+                    });
+                  }),
+                ],
               },
             }),
           ];

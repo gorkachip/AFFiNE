@@ -980,6 +980,13 @@ export class Store {
           blockId: targetId,
           createdBy,
         });
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+          document.dispatchEvent(
+            new CustomEvent('mojo-delete-blocked', {
+              detail: { blockId: targetId, createdBy },
+            })
+          );
+        }
         return;
       }
     }
