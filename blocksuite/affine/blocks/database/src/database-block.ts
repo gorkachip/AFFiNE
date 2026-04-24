@@ -251,6 +251,35 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
               },
               name: 'Delete Database',
               select: () => {
+                // MOJO: gate at the click handler so we get a clear toast
+                // instead of relying on the framework gate's silent skip.
+                const ctx = (
+                  globalThis as unknown as {
+                    __mojoAuthContext?: {
+                      userId: string | null;
+                      isOwnerOrAdmin: boolean;
+                    };
+                  }
+                ).__mojoAuthContext;
+                const createdBy = (
+                  this.model.props as { 'meta:createdBy'?: string }
+                )['meta:createdBy'];
+                if (
+                  ctx &&
+                  !ctx.isOwnerOrAdmin &&
+                  createdBy &&
+                  createdBy !== ctx.userId
+                ) {
+                  document.dispatchEvent(
+                    new CustomEvent('mojo-delete-blocked', {
+                      detail: {
+                        message:
+                          'Only the database creator or a workspace admin can delete this database.',
+                      },
+                    })
+                  );
+                  return;
+                }
                 this.model.children.slice().forEach(block => {
                   this.store.deleteBlock(block);
                 });

@@ -5,6 +5,7 @@ import {
   defineBlockSchema,
 } from '@blocksuite/store';
 
+import type { BlockMeta } from '../../utils/types.js';
 import type {
   ColumnDataType,
   SerializedCells,
@@ -17,7 +18,7 @@ export type DatabaseBlockProps = {
   cells: SerializedCells;
   columns: Array<ColumnDataType>;
   comments?: Record<string, boolean>;
-};
+} & BlockMeta;
 
 export class DatabaseBlockModel extends BlockModel<DatabaseBlockProps> {}
 
@@ -29,6 +30,12 @@ export const DatabaseBlockSchema = defineBlockSchema({
     cells: Object.create(null),
     columns: [],
     comments: undefined,
+    'meta:createdAt': undefined,
+    'meta:createdBy': undefined,
+    'meta:updatedAt': undefined,
+    'meta:updatedBy': undefined,
+    'meta:trashed': undefined,
+    'meta:trashedAt': undefined,
   }),
   metadata: {
     role: 'hub',
