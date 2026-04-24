@@ -15,6 +15,8 @@ import type { KanbanViewUILogic } from './kanban-view-ui-logic.js';
 import { openDetail, popCardMenu } from './menu.js';
 
 const styles = css`
+  /* MOJO: cards = white body with a baby-powder header strip so they
+   * read as physical index cards instead of the default flat grey. */
   affine-data-view-kanban-card {
     display: flex;
     position: relative;
@@ -23,26 +25,34 @@ const styles = css`
     box-shadow: 0px 2px 3px 0px rgba(0, 0, 0, 0.05);
     border-radius: 8px;
     transition: background-color 100ms ease-in-out;
-    background-color: var(--affine-background-kanban-card-color);
+    background-color: #ffffff;
+    overflow: hidden;
   }
 
   affine-data-view-kanban-card:hover {
-    background-color: var(--affine-hover-color);
+    background-color: #fafafa;
   }
 
   affine-data-view-kanban-card .card-header {
-    padding: 8px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    background-color: #fcf9f6;
+    border-bottom: 1px solid ${unsafeCSS(cssVarV2.layer.insideBorder.border)};
   }
 
   affine-data-view-kanban-card .card-header-title uni-lit {
     width: 100%;
   }
 
+  affine-data-view-kanban-card .card-header-title {
+    font-weight: 600;
+    color: #27241e;
+  }
+
   .card-header.has-divider {
-    border-bottom: 0.5px solid ${unsafeCSS(cssVarV2.layer.insideBorder.border)};
+    border-bottom: 1px solid ${unsafeCSS(cssVarV2.layer.insideBorder.border)};
   }
 
   affine-data-view-kanban-card .card-header-title {
