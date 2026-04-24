@@ -206,12 +206,37 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                           props?: { 'meta:trashedAt'?: number };
                         }
                       | undefined;
-                    const text =
-                      model?.text?.toString().trim() ||
-                      `Row ${rowId.slice(0, 6)}`;
+                    const titleText = model?.text?.toString().trim() ?? '';
+                    // If the row title is empty (common when the kanban
+                    // uses other columns as primary info) walk the
+                    // configured columns and pick the first non-empty
+                    // cell value as a hint so admins can recognise the
+                    // card without opening it.
+                    let descriptor = titleText;
+                    if (!descriptor) {
+                      for (const propertyId of ds.properties$.value) {
+                        if (propertyId === 'title') continue;
+                        const cell = ds.cellValueGet(rowId, propertyId);
+                        if (cell == null) continue;
+                        const asText =
+                          typeof cell === 'string'
+                            ? cell
+                            : Array.isArray(cell)
+                              ? cell.join(', ')
+                              : typeof cell === 'object'
+                                ? JSON.stringify(cell)
+                                : String(cell);
+                        const trimmed = asText.trim();
+                        if (trimmed && trimmed !== '[]' && trimmed !== '{}') {
+                          descriptor = trimmed;
+                          break;
+                        }
+                      }
+                    }
+                    if (!descriptor) descriptor = `Row ${rowId.slice(0, 6)}`;
                     const trashedAt = model?.props?.['meta:trashedAt'];
                     const ago = trashedAt ? formatTrashAgo(trashedAt) : '';
-                    const label = `${text.length > 36 ? `${text.slice(0, 36)}…` : text}${ago ? `  ·  ${ago}` : ''}`;
+                    const label = `${descriptor.length > 36 ? `${descriptor.slice(0, 36)}…` : descriptor}${ago ? `  ·  ${ago}` : ''}`;
                     const rowActions = [
                       menu.action({
                         prefix: ExpandFullIcon(),
