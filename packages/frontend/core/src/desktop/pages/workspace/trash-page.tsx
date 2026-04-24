@@ -6,7 +6,9 @@ import {
 import { DocsExplorer } from '@affine/core/components/explorer/docs-view/docs-list';
 import { useBlockSuiteMetaHelper } from '@affine/core/components/hooks/affine/use-block-suite-meta-helper';
 import { Header } from '@affine/core/components/pure/header';
+import { AuthService } from '@affine/core/modules/cloud';
 import { CollectionRulesService } from '@affine/core/modules/collection-rules';
+import { DocsService } from '@affine/core/modules/doc';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { useI18n } from '@affine/i18n';
@@ -69,6 +71,14 @@ export const TrashPage = () => {
 
   const isAdmin = useLiveData(permissionService.permission.isAdmin$);
   const isOwner = useLiveData(permissionService.permission.isOwner$);
+  // MOJO: filter the Trash view so collaborators only see docs they
+  // trashed themselves; owners/admins keep seeing the full workspace
+  // trash.
+  const authService = useService(AuthService);
+  const docsService = useService(DocsService);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
   const groups = useLiveData(explorerContextValue.groups$);
   const isEmpty =
     groups.length === 0 ||
@@ -147,13 +157,37 @@ export const TrashPage = () => {
         },
       })
       .subscribe(result => {
-        explorerContextValue.groups$.next(result.groups);
+        // MOJO: scope non-admins to items they trashed themselves.
+        if (isAdmin || isOwner || !currentUserId) {
+          explorerContextValue.groups$.next(result.groups);
+          return;
+        }
+        const filtered = result.groups
+          .map(group => ({
+            ...group,
+            items: group.items?.filter(docId => {
+              const record = docsService.list.doc$(docId).value;
+              const props = record?.properties$.value as
+                | { trashedBy?: string | null | undefined }
+                | undefined;
+              return props?.trashedBy === currentUserId;
+            }),
+          }))
+          .filter(group => group.items && group.items.length > 0);
+        explorerContextValue.groups$.next(filtered);
       });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [collectionRulesService, explorerContextValue.groups$]);
+  }, [
+    collectionRulesService,
+    explorerContextValue.groups$,
+    isAdmin,
+    isOwner,
+    currentUserId,
+    docsService,
+  ]);
 
   useEffect(() => {
     if (isActiveView) {

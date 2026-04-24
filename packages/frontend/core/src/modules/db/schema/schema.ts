@@ -43,6 +43,9 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     integrationType: integrationType.optional(),
     createdBy: f.string().optional(),
     updatedBy: f.string().optional(),
+    /** MOJO: user id of whoever sent this doc to Trash. Used to filter
+     *  the per-collaborator Trash view. */
+    trashedBy: f.string().optional(),
   }),
   docCustomPropertyInfo: {
     id: f.string().primaryKey().optional().default(nanoid),

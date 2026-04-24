@@ -106,10 +106,18 @@ export class DocRecord extends Entity<{ id: string }> {
         );
       }
     }
+    // MOJO: remember who trashed the doc so the sidebar Trash can show
+    // each collaborator only their own trashed items.
+    if (ctx?.userId) {
+      this.updateProperties({ trashedBy: ctx.userId });
+    }
     return this.setMeta({ trash: true, trashDate: Date.now() });
   }
 
   restoreFromTrash() {
+    // Clear the trashedBy attribution on restore so if someone else
+    // trashes the same doc later we don't mis-attribute it.
+    this.updateProperties({ trashedBy: undefined });
     return this.setMeta({ trash: false, trashDate: undefined });
   }
 
