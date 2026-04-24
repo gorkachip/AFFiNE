@@ -82,7 +82,30 @@ export class DocRecord extends Entity<{ id: string }> {
     return this.docsStore.getDocPrimaryModeSetting(this.id);
   }
 
+  /**
+   * MOJO: enforce that only the doc creator or a workspace owner/admin
+   * can move a doc to trash. This is the single chokepoint that every
+   * upstream "delete doc" path eventually calls, so guarding here covers
+   * sidebar menus, doc page header, /all list, journal tab, command
+   * palette, etc.
+   *
+   * Detection of the current user/admin happens via globals injected at
+   * boot (see useMojoAuthBridge in the app shell): we don't import
+   * AuthService here to avoid circular deps in the doc module.
+   */
   moveToTrash() {
+    const ctx = (globalThis as any).__mojoAuthContext as
+      | { userId: string | null; isOwnerOrAdmin: boolean }
+      | undefined;
+    if (ctx) {
+      const createdBy = this.property$('createdBy').value as string | undefined;
+      const isCreator = !!ctx.userId && !!createdBy && ctx.userId === createdBy;
+      if (!ctx.isOwnerOrAdmin && !isCreator) {
+        throw new Error(
+          'You do not have permission to delete this document. Only the creator or a workspace admin can move it to trash.'
+        );
+      }
+    }
     return this.setMeta({ trash: true, trashDate: Date.now() });
   }
 

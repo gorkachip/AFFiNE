@@ -1,5 +1,6 @@
 import { DNDContext } from '@affine/component';
 import { AffineOtherPageLayout } from '@affine/component/affine-other-page-layout';
+import { MojoAuthBridge } from '@affine/core/components/mojo-auth-bridge';
 import { workbenchRoutes } from '@affine/core/desktop/workbench-router';
 import {
   DefaultServerService,
@@ -348,6 +349,7 @@ const WorkspacePage = ({ meta }: { meta: WorkspaceMetadata }) => {
       <DNDContextProvider>
         <OpenInAppGuard>
           <AffineErrorBoundary height="100vh">
+            <MojoAuthBridge />
             <WorkspaceLayout>
               <WorkbenchRoot />
             </WorkspaceLayout>
