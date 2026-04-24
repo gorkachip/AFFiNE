@@ -200,7 +200,22 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   });
 
   rows$: ReadonlySignal<string[]> = computed(() => {
-    return this._model.children.map(v => v.id);
+    return this._model.children
+      .filter(v => {
+        const props = (v as ParagraphBlockModel).props;
+        return !props['meta:trashed'];
+      })
+      .map(v => v.id);
+  });
+
+  // MOJO: trashed rows surfaced to the per-kanban Trash UI for admins.
+  trashedRows$: ReadonlySignal<string[]> = computed(() => {
+    return this._model.children
+      .filter(v => {
+        const props = (v as ParagraphBlockModel).props;
+        return !!props['meta:trashed'];
+      })
+      .map(v => v.id);
   });
 
   viewConverts = databaseBlockViewConverts;
@@ -610,6 +625,57 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   rowDelete(ids: string[]): void {
+    // MOJO: rows go to a per-kanban soft-delete bin instead of being
+    // physically removed. Hard-delete only happens via rowPermaDelete from
+    // the admin Trash UI. Collaborators can only soft-delete rows they
+    // created (or any row, if they're a workspace admin).
+    const auth = getMojoAuth();
+    this.doc.captureSync();
+    this.doc.transact(() => {
+      for (const id of ids) {
+        const block = this.doc.getBlock(id);
+        const model = block?.model as ParagraphBlockModel | undefined;
+        if (!model) continue;
+        if (auth && !auth.isOwnerOrAdmin) {
+          const createdBy = model.props['meta:createdBy'];
+          if (createdBy && createdBy !== auth.userId) {
+            throw new Error(
+              'Only the card creator or a workspace admin can delete this card.'
+            );
+          }
+        }
+        if (model.keys.includes('meta:trashed')) {
+          model.props['meta:trashed'] = true;
+          model.props['meta:trashedAt'] = Date.now();
+        } else {
+          // Legacy block without the soft-trash field — fall back to the
+          // original hard-delete so the action still has an effect.
+          this.doc.deleteBlock(model);
+        }
+      }
+    });
+  }
+
+  // MOJO: admin-only — restore a previously trashed row back to the
+  // visible kanban.
+  rowRestore(ids: string[]): void {
+    this.doc.captureSync();
+    this.doc.transact(() => {
+      for (const id of ids) {
+        const block = this.doc.getBlock(id);
+        const model = block?.model as ParagraphBlockModel | undefined;
+        if (!model) continue;
+        if (model.keys.includes('meta:trashed')) {
+          model.props['meta:trashed'] = undefined;
+          model.props['meta:trashedAt'] = undefined;
+        }
+      }
+    });
+  }
+
+  // MOJO: admin-only — permanently delete a trashed row. Bypasses the
+  // soft-delete logic by going through deleteRows + the framework store.
+  rowPermaDelete(ids: string[]): void {
     this.doc.captureSync();
     for (const id of ids) {
       const block = this.doc.getBlock(id);

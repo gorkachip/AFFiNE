@@ -42,6 +42,7 @@ import {
   CopyIcon,
   DeleteIcon,
   MoreHorizontalIcon,
+  ResetIcon,
 } from '@blocksuite/icons/lit';
 import { type BlockComponent, BlockSelection } from '@blocksuite/std';
 import { RANGE_SYNC_EXCLUDE_ATTR } from '@blocksuite/std/inline';
@@ -113,6 +114,59 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
               })
               .catch(console.error);
           },
+        }),
+        // MOJO: per-kanban Trash entry, visible only to workspace
+        // owners/admins. Lists soft-deleted rows with Restore + Delete
+        // forever actions.
+        menu.dynamic(() => {
+          const auth = (
+            globalThis as unknown as {
+              __mojoAuthContext?: {
+                userId: string | null;
+                isOwnerOrAdmin: boolean;
+              };
+            }
+          ).__mojoAuthContext;
+          if (!auth?.isOwnerOrAdmin) return [];
+          const ds = this.dataSource.value;
+          const trashedIds = ds.trashedRows$.value;
+          if (trashedIds.length === 0) return [];
+          return [
+            menu.subMenu({
+              name: `Trash (${trashedIds.length})`,
+              prefix: DeleteIcon(),
+              options: {
+                items: trashedIds.map(rowId => {
+                  const block = ds.doc.getBlock(rowId);
+                  const text =
+                    block?.model.text?.toString().trim() ||
+                    `Row ${rowId.slice(0, 6)}`;
+                  return menu.subMenu({
+                    name: text.length > 40 ? `${text.slice(0, 40)}…` : text,
+                    options: {
+                      items: [
+                        menu.action({
+                          prefix: ResetIcon(),
+                          name: 'Restore',
+                          select: () => {
+                            ds.rowRestore([rowId]);
+                          },
+                        }),
+                        menu.action({
+                          prefix: DeleteIcon(),
+                          class: { 'delete-item': true },
+                          name: 'Delete forever',
+                          select: () => {
+                            ds.rowPermaDelete([rowId]);
+                          },
+                        }),
+                      ],
+                    },
+                  });
+                }),
+              },
+            }),
+          ];
         }),
         menu.group({
           items: [

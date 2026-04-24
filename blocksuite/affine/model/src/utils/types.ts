@@ -41,4 +41,8 @@ export type BlockMeta = {
   'meta:createdBy'?: string;
   'meta:updatedAt'?: number;
   'meta:updatedBy'?: string;
+  /** MOJO: soft-delete flag for database rows (cards). Hidden from views,
+   *  visible to admins via the per-kanban Trash. */
+  'meta:trashed'?: boolean;
+  'meta:trashedAt'?: number;
 };

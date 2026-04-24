@@ -949,6 +949,41 @@ export class Store {
       return;
     }
 
+    // MOJO: workspace-wide creator gate. Resolved through a global written
+    // by MojoAuthBridge in the React shell so this framework module stays
+    // free of UI dependencies. Skipped when the global isn't present
+    // (tests, headless tooling, sync workers) so existing call sites keep
+    // working.
+    const ctx = (
+      globalThis as unknown as {
+        __mojoAuthContext?: { userId: string | null; isOwnerOrAdmin: boolean };
+      }
+    ).__mojoAuthContext;
+    if (ctx && !ctx.isOwnerOrAdmin) {
+      const targetId = typeof model === 'string' ? model : model.id;
+      const target = this.getBlock(targetId)?.model as
+        | (BlockModel & { props?: Record<string, unknown>; keys?: string[] })
+        | undefined;
+      const props = (target?.props ?? {}) as Record<string, unknown>;
+      const keys = (target?.keys ?? []) as string[];
+      const createdBy =
+        keys.includes('meta:createdBy') &&
+        typeof props['meta:createdBy'] === 'string'
+          ? (props['meta:createdBy'] as string)
+          : undefined;
+      if (createdBy && createdBy !== ctx.userId) {
+        // Silent block — throwing here would crash framework-internal
+        // delete paths (e.g. backspace on an empty paragraph created by
+        // someone else). The user-facing delete actions in the database
+        // data-source surface the gate explicitly with a thrown error.
+        console.warn('[mojo] blocked delete of block created by another user', {
+          blockId: targetId,
+          createdBy,
+        });
+        return;
+      }
+    }
+
     const opts = (
       options && options.bringChildrenTo
         ? {

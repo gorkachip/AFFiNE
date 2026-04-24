@@ -38,6 +38,8 @@ export const ParagraphBlockSchema = defineBlockSchema({
     'meta:createdBy': undefined,
     'meta:updatedAt': undefined,
     'meta:updatedBy': undefined,
+    'meta:trashed': undefined,
+    'meta:trashedAt': undefined,
   }),
   metadata: {
     version: 1,
