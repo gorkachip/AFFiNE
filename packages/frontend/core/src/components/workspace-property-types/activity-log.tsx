@@ -1,7 +1,10 @@
-import { Menu, PropertyValue } from '@affine/component';
+import { Menu, PropertyValue, Tooltip } from '@affine/component';
 import { AuthService } from '@affine/core/modules/cloud';
+import { DocService } from '@affine/core/modules/doc';
+import { NotificationService } from '@affine/core/modules/notification';
 import { WorkspaceMembersService } from '@affine/core/modules/permissions';
 import type { Member } from '@affine/core/modules/permissions/entities/members';
+import { WorkspaceService } from '@affine/core/modules/workspace';
 import {
   CommentIcon,
   DeleteIcon as TrashIcon,
@@ -137,9 +140,42 @@ export const ActivityLogValueRenderer = ({
 }: PropertyValueProps) => {
   const authService = useService(AuthService);
   const membersService = useService(WorkspaceMembersService);
+  const docService = useService(DocService);
+  const workspaceService = useService(WorkspaceService);
+  const notificationService = useService(NotificationService);
   const account = useLiveData(authService.session.account$);
   const rawMembers = useLiveData(membersService.members.pageMembers$);
   const members = useMemo<Member[]>(() => rawMembers ?? [], [rawMembers]);
+  const docTitle = useLiveData(docService.doc.record.title$);
+  const docMode = useLiveData(docService.doc.record.primaryMode$);
+  const isCloud = workspaceService.workspace.flavour !== 'local';
+
+  const notifyMentions = useCallback(
+    (recipients: string[]) => {
+      if (!isCloud || !account) return;
+      const workspaceId = workspaceService.workspace.id;
+      const doc = {
+        id: docService.doc.id,
+        title: docTitle || 'Untitled',
+        mode: docMode,
+      };
+      for (const userId of recipients) {
+        if (userId === account.id) continue;
+        notificationService.mentionUser(userId, workspaceId, doc).catch(() => {
+          // silently ignore (self-mention denial, no read access, etc)
+        });
+      }
+    },
+    [
+      isCloud,
+      account,
+      workspaceService,
+      docService,
+      docTitle,
+      docMode,
+      notificationService,
+    ]
+  );
 
   useEffect(() => {
     membersService.members.setPageNum(0);
@@ -237,10 +273,19 @@ export const ActivityLogValueRenderer = ({
       next = { entries: [...parsed.entries, entry] };
     }
     onChange(serializeValue(next));
+    notifyMentions(mentions);
     setDraft('');
     setReplyTo(null);
     setMentionQuery(null);
-  }, [draft, account, members, parsed.entries, replyTo, onChange]);
+  }, [
+    draft,
+    account,
+    members,
+    parsed.entries,
+    replyTo,
+    onChange,
+    notifyMentions,
+  ]);
 
   const onDraftKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -298,15 +343,18 @@ export const ActivityLogValueRenderer = ({
 
   const commitEdit = useCallback(() => {
     if (!editingId) return;
-    const updated = (e: ActivityEntry): ActivityEntry =>
-      e.id === editingId
-        ? {
-            ...e,
-            text: editDraft.trim() || e.text,
-            editedAt: Date.now(),
-            mentions: extractMentions(editDraft, members),
-          }
-        : e;
+    const newMentions = extractMentions(editDraft, members);
+    let prevMentions: string[] = [];
+    const updated = (e: ActivityEntry): ActivityEntry => {
+      if (e.id !== editingId) return e;
+      prevMentions = e.mentions ?? [];
+      return {
+        ...e,
+        text: editDraft.trim() || e.text,
+        editedAt: Date.now(),
+        mentions: newMentions,
+      };
+    };
     const next: ActivityLogValue = {
       entries: parsed.entries.map(e => ({
         ...updated(e),
@@ -314,9 +362,13 @@ export const ActivityLogValueRenderer = ({
       })),
     };
     onChange(serializeValue(next));
+    // Only fire notifications for mentions that weren't already in the entry,
+    // so re-saving doesn't spam users who were tagged from the start.
+    const added = newMentions.filter(id => !prevMentions.includes(id));
+    notifyMentions(added);
     setEditingId(null);
     setEditDraft('');
-  }, [editingId, editDraft, members, parsed.entries, onChange]);
+  }, [editingId, editDraft, members, parsed.entries, onChange, notifyMentions]);
 
   const renderEntry = (entry: ActivityEntry, isReply = false) => {
     const isOwn = entry.authorId === account?.id;
@@ -487,21 +539,51 @@ export const ActivityLogValueRenderer = ({
   );
 };
 
-export const ActivityLogDocListProperty = ({
-  value,
-  propertyInfo,
-}: DocListPropertyProps) => {
+export const ActivityLogDocListProperty = ({ value }: DocListPropertyProps) => {
   const parsed = parseValue(value);
   const count = parsed.entries.reduce(
     (a, e) => a + 1 + (e.replies?.length ?? 0),
     0
   );
+  const last = parsed.entries[parsed.entries.length - 1];
+  const lastLabel = last
+    ? `${count} · ${formatRelativeTime(last.timestamp)}`
+    : '0';
+  const previewEntries = parsed.entries.slice(-3).reverse();
+
+  if (count === 0) {
+    return (
+      <StackProperty icon={<CommentIcon />}>
+        <span className={styles.docListContainer}>—</span>
+      </StackProperty>
+    );
+  }
+
   return (
-    <StackProperty icon={<CommentIcon />}>
-      <span className={styles.docListContainer}>
-        {count} {propertyInfo.name ? `· ${propertyInfo.name}` : 'updates'}
-      </span>
-    </StackProperty>
+    <Tooltip
+      side="top"
+      content={
+        <div className={styles.previewTooltip}>
+          {previewEntries.map(e => (
+            <div className={styles.previewEntry} key={e.id}>
+              <div className={styles.previewHead}>
+                <span className={styles.previewAuthor}>{e.authorName}</span>
+                <span className={styles.previewTime}>
+                  {formatRelativeTime(e.timestamp)}
+                </span>
+              </div>
+              <div className={styles.previewBody}>
+                {e.text.length > 120 ? `${e.text.slice(0, 120)}…` : e.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      }
+    >
+      <StackProperty icon={<CommentIcon />}>
+        <span className={styles.docListContainer}>{lastLabel}</span>
+      </StackProperty>
+    </Tooltip>
   );
 };
 

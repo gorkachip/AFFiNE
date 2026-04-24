@@ -240,3 +240,40 @@ export const docListContainer = style({
   fontSize: 12,
   color: cssVarV2('text/secondary'),
 });
+
+export const previewTooltip = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  maxWidth: 320,
+  padding: 4,
+});
+
+export const previewEntry = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+});
+
+export const previewHead = style({
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 6,
+  fontSize: 11,
+});
+
+export const previewAuthor = style({
+  fontWeight: 600,
+});
+
+export const previewTime = style({
+  opacity: 0.7,
+  fontSize: 10,
+});
+
+export const previewBody = style({
+  fontSize: 12,
+  lineHeight: 1.4,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+});
