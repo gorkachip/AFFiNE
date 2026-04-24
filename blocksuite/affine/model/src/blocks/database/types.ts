@@ -5,6 +5,8 @@ export interface ColumnDataType<
   type: string;
   name: string;
   data: Data;
+  /** MOJO: workspace user id of the collaborator who added this column. */
+  createdBy?: string;
 }
 
 export type ColumnUpdater<T extends ColumnDataType = ColumnDataType> = (

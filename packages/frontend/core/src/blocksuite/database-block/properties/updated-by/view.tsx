@@ -111,7 +111,7 @@ const UpdatedByCell = forwardRef(UpdatedByCellComponent);
 
 export const updatedByPropertyConfig =
   updatedByPropertyModelConfig.createPropertyMeta({
-    icon: createIcon('MemberIcon'),
+    icon: createIcon('PenIcon'),
     cellRenderer: {
       view: uniReactRoot.createUniComponent(UpdatedByCell),
     },

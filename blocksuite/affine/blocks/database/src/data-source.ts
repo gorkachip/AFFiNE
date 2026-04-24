@@ -57,6 +57,19 @@ type SpacialProperty = {
   valueGet: (rowId: string, propertyId: string) => unknown;
 };
 
+// MOJO: read by every database mutation to enforce "creator or admin only"
+// on column delete and to attribute changes back to the acting user. Set by
+// MojoAuthBridge in the React host; falls back to a no-op when absent (e.g.
+// running outside the AFFiNE shell during tests).
+type MojoAuthContext = {
+  userId: string | null;
+  isOwnerOrAdmin: boolean;
+};
+function getMojoAuth(): MojoAuthContext | undefined {
+  return (globalThis as unknown as { __mojoAuthContext?: MojoAuthContext })
+    .__mojoAuthContext;
+}
+
 export class DatabaseBlockDataSource extends DataSourceBase {
   override get parentProvider() {
     return this._model.store.provider;
@@ -282,6 +295,24 @@ export class DatabaseBlockDataSource extends DataSourceBase {
         }
       },
     });
+    // MOJO: cell mutations live on the parent database block, so the row
+    // block's own meta:updatedBy never moves. Stamp it here so the
+    // "Last Edited By" column reflects whoever just changed any cell
+    // (status, member, comment, activity log entry, etc).
+    this._touchRowAuthor(rowId);
+  }
+
+  private _touchRowAuthor(rowId: string): void {
+    const auth = getMojoAuth();
+    if (!auth?.userId) return;
+    const block = this.doc.getBlock(rowId);
+    const model = block?.model as ParagraphBlockModel | undefined;
+    if (!model) return;
+    if (!model.keys.includes('meta:updatedBy')) return;
+    this.doc.withoutTransact(() => {
+      model.props['meta:updatedBy'] = auth.userId ?? undefined;
+      model.props['meta:updatedAt'] = Date.now();
+    });
   }
 
   cellValueGet(rowId: string, propertyId: string): unknown {
@@ -325,11 +356,13 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     if (!property) {
       return;
     }
-    const result = addProperty(
-      this._model,
-      insertToPosition,
-      property.create(this.newPropertyName(name))
-    );
+    const created = property.create(this.newPropertyName(name));
+    // MOJO: stamp the creator so we can gate column deletions later.
+    const auth = getMojoAuth();
+    if (auth?.userId) {
+      created.createdBy = auth.userId;
+    }
+    const result = addProperty(this._model, insertToPosition, created);
     return result;
   }
 
@@ -441,6 +474,18 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     this.doc.captureSync();
     const index = this._model.props.columns.findIndex(v => v.id === id);
     if (index < 0) return;
+
+    // MOJO: only the column's creator (or workspace owner/admin) can drop it.
+    const auth = getMojoAuth();
+    if (auth && !auth.isOwnerOrAdmin) {
+      const column = this._model.props.columns[index];
+      const createdBy = column?.createdBy;
+      if (createdBy && createdBy !== auth.userId) {
+        throw new Error(
+          'Only the column creator or a workspace admin can delete this property.'
+        );
+      }
+    }
 
     this.doc.transact(() => {
       this._model.props.columns = this._model.props.columns.filter(
