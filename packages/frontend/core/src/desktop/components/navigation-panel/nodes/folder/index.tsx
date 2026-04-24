@@ -165,6 +165,24 @@ export const NavigationPanelFolderNode = ({
   return;
 };
 
+// MOJO: walk a folder's descendants synchronously and report whether any
+// of them is directly visible to the user. Used so that a parent folder
+// the user can't see itself but contains a shared subfolder still appears
+// in the sidebar as a passthrough so they can navigate down.
+function hasVisibleDescendant(
+  node: FolderNode,
+  userId: string | null,
+  isOwnerOrAdmin: boolean
+): boolean {
+  for (const child of node.children$.value) {
+    if (child.type$.value !== 'folder') continue;
+    const v = parseVisibility(child.visibility$.value);
+    if (canUserSeeFolder(v, userId, isOwnerOrAdmin)) return true;
+    if (hasVisibleDescendant(child, userId, isOwnerOrAdmin)) return true;
+  }
+  return false;
+}
+
 // Define outside the `NavigationPanelFolderNodeFolder` to avoid re-render(the close animation won't play)
 const NavigationPanelFolderIcon: NavigationPanelTreeNodeIcon = ({
   collapsed,
@@ -223,11 +241,28 @@ const NavigationPanelFolderNodeFolder = ({
     const v = parseVisibility(visibilityRaw);
     return canUserSeeFolder(v, currentUserId, !!isOwnerOrAdmin);
   }, [visibilityRaw, currentUserId, isOwnerOrAdmin]);
+  // Children list is read here (not just for rendering) so we can detect
+  // whether the user has access to any descendant when they don't have
+  // direct visibility on this folder. If they do, render this folder in
+  // "passthrough" mode so they can navigate down into the shared sub-tree.
+  const childrenSnapshot = useLiveData(node.children$);
+  const passthrough = useMemo(() => {
+    if (visible) return false;
+    if (node.id === null) return false;
+    // Touch the snapshot so the memo recomputes when children are added
+    // or removed; visibility changes deeper in the tree are only picked
+    // up on the next re-render rather than reactively (fine for the rare
+    // event of a share toggle).
+    void childrenSnapshot.length;
+    return hasVisibleDescendant(node, currentUserId, !!isOwnerOrAdmin);
+  }, [visible, childrenSnapshot, currentUserId, isOwnerOrAdmin, node]);
   const isCreator =
     !!currentUserId && !!createdBy && createdBy === currentUserId;
   // Creator, owners and admins can manage this folder (share visibility +
   // delete it). Regular collaborators can only touch folders they created.
-  const canManage = isCreator || !!isOwnerOrAdmin;
+  // Passthrough mode (parent of a shared subfolder) gets no management
+  // controls regardless of who created it.
+  const canManage = !passthrough && (isCreator || !!isOwnerOrAdmin);
   const enableEmojiIcon = useLiveData(
     featureFlagService.flags.enable_emoji_folder_icon.$
   );
@@ -690,6 +725,16 @@ const NavigationPanelFolderNodeFolder = ({
   );
 
   const folderOperations = useMemo(() => {
+    // MOJO: passthrough mode means the user only sees this folder so they
+    // can navigate down into a shared subfolder — no content controls.
+    if (passthrough) {
+      return [
+        {
+          index: 200,
+          view: node.id ? <FavoriteFolderOperation id={node.id} /> : null,
+        },
+      ];
+    }
     // MOJO: anyone in the workspace can add content (subfolders, docs,
     // tags, collections) into any folder. Only the folder's creator
     // (or a workspace owner/admin) can rename / share / delete the
@@ -807,6 +852,7 @@ const NavigationPanelFolderNodeFolder = ({
     handleDelete,
     handleNewDoc,
     canManage,
+    passthrough,
     node,
     t,
   ]);
@@ -861,7 +907,7 @@ const NavigationPanelFolderNodeFolder = ({
     [setCollapsed]
   );
 
-  if (!visible) {
+  if (!visible && !passthrough) {
     return null;
   }
 
