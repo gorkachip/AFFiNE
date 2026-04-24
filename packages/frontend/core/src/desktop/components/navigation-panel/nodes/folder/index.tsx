@@ -690,17 +690,10 @@ const NavigationPanelFolderNodeFolder = ({
   );
 
   const folderOperations = useMemo(() => {
-    // MOJO: collaborators who did not create this folder (and are not
-    // workspace owner/admin) can only view it. Hide add/rename/delete
-    // operations so they cannot modify someone else's folder.
-    if (!canManage) {
-      return [
-        {
-          index: 200,
-          view: node.id ? <FavoriteFolderOperation id={node.id} /> : null,
-        },
-      ];
-    }
+    // MOJO: anyone in the workspace can add content (subfolders, docs,
+    // tags, collections) into any folder. Only the folder's creator
+    // (or a workspace owner/admin) can rename / share / delete the
+    // folder itself.
     return [
       {
         index: 0,
@@ -717,17 +710,21 @@ const NavigationPanelFolderNodeFolder = ({
           </IconButton>
         ),
       },
-      {
-        index: 99,
-        view: (
-          <MenuItem
-            prefixIcon={<ShareIcon />}
-            onClick={() => setShareOpen(true)}
-          >
-            Share folder
-          </MenuItem>
-        ),
-      },
+      ...(canManage
+        ? [
+            {
+              index: 99,
+              view: (
+                <MenuItem
+                  prefixIcon={<ShareIcon />}
+                  onClick={() => setShareOpen(true)}
+                >
+                  Share folder
+                </MenuItem>
+              ),
+            },
+          ]
+        : []),
       {
         index: 100,
         view: (
@@ -783,22 +780,26 @@ const NavigationPanelFolderNodeFolder = ({
         view: node.id ? <FavoriteFolderOperation id={node.id} /> : null,
       },
 
-      {
-        index: 9999,
-        view: <MenuSeparator key="menu-separator" />,
-      },
-      {
-        index: 10000,
-        view: (
-          <MenuItem
-            type={'danger'}
-            prefixIcon={<DeleteIcon />}
-            onClick={handleDelete}
-          >
-            {t['com.affine.rootAppSidebar.organize.delete']()}
-          </MenuItem>
-        ),
-      },
+      ...(canManage
+        ? [
+            {
+              index: 9999,
+              view: <MenuSeparator key="menu-separator" />,
+            },
+            {
+              index: 10000,
+              view: (
+                <MenuItem
+                  type={'danger'}
+                  prefixIcon={<DeleteIcon />}
+                  onClick={handleDelete}
+                >
+                  {t['com.affine.rootAppSidebar.organize.delete']()}
+                </MenuItem>
+              ),
+            },
+          ]
+        : []),
     ];
   }, [
     handleAddToFolder,
@@ -870,23 +871,23 @@ const NavigationPanelFolderNodeFolder = ({
         icon={NavigationPanelFolderIcon}
         name={name}
         dndData={dndData}
-        onDrop={canManage ? handleDropOnFolder : undefined}
+        onDrop={handleDropOnFolder}
         defaultRenaming={defaultRenaming}
-        renameable={canManage}
+        renameable
         extractEmojiAsIcon={enableEmojiIcon}
-        reorderable={canManage && reorderable}
+        reorderable={reorderable}
         collapsed={collapsed}
         setCollapsed={handleCollapsedChange}
-        onRename={canManage ? handleRename : undefined}
+        onRename={handleRename}
         operations={finalOperations}
-        canDrop={canManage ? handleCanDrop : undefined}
+        canDrop={handleCanDrop}
         childrenPlaceholder={
           <FolderEmpty
-            canDrop={canManage ? handleCanDrop : undefined}
-            onDrop={canManage ? handleDropOnPlaceholder : undefined}
+            canDrop={handleCanDrop}
+            onDrop={handleDropOnPlaceholder}
           />
         }
-        dropEffect={canManage ? handleDropEffect : undefined}
+        dropEffect={handleDropEffect}
         data-testid={`navigation-panel-folder-${node.id}`}
         explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
       >
