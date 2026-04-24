@@ -871,23 +871,23 @@ const NavigationPanelFolderNodeFolder = ({
         icon={NavigationPanelFolderIcon}
         name={name}
         dndData={dndData}
-        onDrop={handleDropOnFolder}
+        onDrop={canManage ? handleDropOnFolder : undefined}
         defaultRenaming={defaultRenaming}
-        renameable
+        renameable={canManage}
         extractEmojiAsIcon={enableEmojiIcon}
-        reorderable={reorderable}
+        reorderable={canManage && reorderable}
         collapsed={collapsed}
         setCollapsed={handleCollapsedChange}
-        onRename={handleRename}
+        onRename={canManage ? handleRename : undefined}
         operations={finalOperations}
-        canDrop={handleCanDrop}
+        canDrop={canManage ? handleCanDrop : undefined}
         childrenPlaceholder={
           <FolderEmpty
-            canDrop={handleCanDrop}
-            onDrop={handleDropOnPlaceholder}
+            canDrop={canManage ? handleCanDrop : undefined}
+            onDrop={canManage ? handleDropOnPlaceholder : undefined}
           />
         }
-        dropEffect={handleDropEffect}
+        dropEffect={canManage ? handleDropEffect : undefined}
         data-testid={`navigation-panel-folder-${node.id}`}
         explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
       >
