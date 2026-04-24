@@ -76,6 +76,25 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     collectionId: f.string().primaryKey(),
     index: f.string(),
   },
+  /**
+   * MOJO: workspace-wide index of deadlines set on kanban cards. Written
+   * whenever a Deadline cell or its row's Member cell changes. Lets the
+   * /deadlines page (and any future calendar widgets) list deadlines
+   * without scanning every database block in every doc.
+   */
+  deadlines: {
+    // composite key: `${docId}:${rowId}`
+    id: f.string().primaryKey(),
+    docId: f.string(),
+    rowId: f.string(),
+    deadline: f.number(),
+    createdBy: f.string().optional(),
+    /** JSON-encoded string[] of member user ids assigned to the row. */
+    memberIds: f.string().optional(),
+    /** Last seen card title, cached so the list view can render it
+     *  without opening the doc. */
+    title: f.string().optional(),
+  },
   explorerIcon: {
     /**
      * ${doc|collection|folder|tag}:${id}

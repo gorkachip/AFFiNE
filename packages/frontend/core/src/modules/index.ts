@@ -18,6 +18,7 @@ import { configureCollectionModule } from './collection';
 import { configureCollectionRulesModule } from './collection-rules';
 import { configureCommentModule } from './comment';
 import { configureWorkspaceDBModule } from './db';
+import { configureDeadlineModule } from './deadline';
 import { configureDialogModule } from './dialogs';
 import { configureDndModule } from './dnd';
 import { configureDocModule } from './doc';
@@ -96,6 +97,7 @@ export function configureCommonModules(framework: Framework) {
   configureDocsSearchModule(framework);
   configureDocLinksModule(framework);
   configureOrganizeModule(framework);
+  configureDeadlineModule(framework);
   configureFavoriteModule(framework);
   configureNavigationPanelModule(framework);
   configureThemeEditorModule(framework);

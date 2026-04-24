@@ -38,6 +38,7 @@ import {
 } from '../../desktop/components/navigation-panel';
 import { WorkbenchService } from '../../modules/workbench';
 import { WorkspaceNavigator } from '../workspace-selector';
+import { DeadlinesButton } from './deadlines-button';
 import {
   bottomContainer,
   brandHeader,
@@ -242,6 +243,7 @@ export const RootAppSidebar = memo((): ReactElement => {
           title={t['com.affine.rootAppSidebar.others']()}
           contentStyle={{ padding: '6px 8px 0 8px' }}
         >
+          <DeadlinesButton />
           <TrashButton />
           <MenuItem
             data-testid="slider-bar-import-button"

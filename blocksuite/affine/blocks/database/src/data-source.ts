@@ -335,6 +335,59 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     // "Last Edited By" column reflects whoever just changed any cell
     // (status, member, comment, activity log entry, etc).
     this._touchRowAuthor(rowId);
+    // MOJO: keep the workspace deadlines index in sync. Triggered when
+    // either a deadline cell changed directly OR a member cell changed
+    // on a row that already has a deadline (so member assignments flow
+    // through to the calendar view).
+    if (type === 'deadline' || type === 'member') {
+      this._syncDeadlineIndex(rowId);
+    }
+  }
+
+  private _syncDeadlineIndex(rowId: string): void {
+    const bridge = (
+      globalThis as unknown as {
+        __mojoDeadlineIndex?: {
+          upsert: (entry: {
+            docId: string;
+            rowId: string;
+            deadline: number;
+            createdBy?: string;
+            memberIds: string[];
+            title: string;
+          }) => void;
+          remove: (docId: string, rowId: string) => void;
+        };
+      }
+    ).__mojoDeadlineIndex;
+    if (!bridge) return;
+    const docId = this._model.store.id;
+    let deadline: number | null = null;
+    const memberIds: string[] = [];
+    for (const column of this._model.props.columns$.value) {
+      if (column.type === 'deadline') {
+        const v = this.cellValueGet(rowId, column.id);
+        if (typeof v === 'number') deadline = v;
+      } else if (column.type === 'member') {
+        const v = this.cellValueGet(rowId, column.id);
+        if (Array.isArray(v)) {
+          for (const id of v) {
+            if (typeof id === 'string') memberIds.push(id);
+          }
+        }
+      }
+    }
+    if (deadline == null) {
+      bridge.remove(docId, rowId);
+      return;
+    }
+    const block = this.doc.getBlock(rowId);
+    const model = block?.model as
+      | { text?: { toString(): string }; props?: { 'meta:createdBy'?: string } }
+      | undefined;
+    const title = model?.text?.toString().trim() || '';
+    const createdBy = model?.props?.['meta:createdBy'];
+    bridge.upsert({ docId, rowId, deadline, createdBy, memberIds, title });
   }
 
   private _touchRowAuthor(rowId: string): void {
@@ -674,8 +727,22 @@ export class DatabaseBlockDataSource extends DataSourceBase {
           // original hard-delete so the action still has an effect.
           this.doc.deleteBlock(model);
         }
+        // MOJO: drop from the workspace deadlines index while the row is
+        // trashed. rowRestore re-syncs it.
+        this._removeFromDeadlineIndex(id);
       }
     });
+  }
+
+  private _removeFromDeadlineIndex(rowId: string): void {
+    const bridge = (
+      globalThis as unknown as {
+        __mojoDeadlineIndex?: {
+          remove: (docId: string, rowId: string) => void;
+        };
+      }
+    ).__mojoDeadlineIndex;
+    bridge?.remove(this._model.store.id, rowId);
   }
 
   // MOJO: restore a previously trashed row. Allowed for the original
@@ -702,6 +769,9 @@ export class DatabaseBlockDataSource extends DataSourceBase {
           model.props['meta:trashed'] = undefined;
           model.props['meta:trashedAt'] = undefined;
         }
+        // MOJO: re-sync the deadline index so the card shows up in the
+        // calendar again if it still has a deadline set.
+        this._syncDeadlineIndex(id);
       }
     });
   }
@@ -722,6 +792,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       if (block) {
         this.doc.deleteBlock(block.model);
       }
+      this._removeFromDeadlineIndex(id);
     }
     deleteRows(this._model, ids);
   }
