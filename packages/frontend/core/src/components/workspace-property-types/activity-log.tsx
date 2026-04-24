@@ -452,90 +452,98 @@ export const ActivityLogValueRenderer = ({
     );
   };
 
-  return (
-    <Menu
-      rootOptions={{ open, onOpenChange: setOpen, modal: true }}
-      contentOptions={{
-        sideOffset: 4,
-        align: 'start',
-        className: styles.popoverRoot,
-      }}
-      items={
-        <>
-          <div className={styles.entryList}>
-            {parsed.entries.length === 0 ? (
-              <div className={styles.emptyState}>
-                No activity yet. Be the first to add an update.
-              </div>
-            ) : (
-              parsed.entries.map(e => renderEntry(e))
-            )}
+  const popoverContent = (
+    <>
+      <div className={styles.entryList}>
+        {parsed.entries.length === 0 ? (
+          <div className={styles.emptyState}>
+            No activity yet. Be the first to add an update.
           </div>
-          {!readonly && (
-            <div className={styles.inputArea}>
-              {replyTo && (
-                <div className={styles.replyingTo}>
-                  <span>Replying to thread</span>
-                  <button
-                    className={styles.entryActionButton}
-                    onClick={() => setReplyTo(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-              {mentionQuery !== null && filteredMembers.length > 0 && (
-                <div className={styles.mentionMenu}>
-                  {filteredMembers.map((m: Member, idx: number) => (
-                    <div
-                      key={m.id}
-                      className={styles.mentionItem}
-                      data-active={idx === activeMentionIdx ? 'true' : 'false'}
-                      onMouseDown={e => {
-                        e.preventDefault();
-                        insertMention(m);
-                      }}
-                    >
-                      {m.name ?? m.email ?? m.id}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <textarea
-                ref={textareaRef}
-                className={styles.textarea}
-                placeholder="Add an update… use @ to mention. ⌘/Ctrl+Enter to send."
-                value={draft}
-                onChange={onDraftChange}
-                onKeyDown={onDraftKeyDown}
-              />
-              <div className={styles.footerRow}>
-                <span>
-                  {lastEntry
-                    ? `${entryCount} entries · last ${formatRelativeTime(
-                        lastEntry.timestamp
-                      )}`
-                    : 'No entries yet'}
-                </span>
-                <button
-                  className={styles.submitButton}
-                  disabled={!draft.trim()}
-                  onClick={submit}
-                >
-                  {replyTo ? 'Reply' : 'Add'}
-                </button>
-              </div>
+        ) : (
+          parsed.entries.map(e => renderEntry(e))
+        )}
+      </div>
+      {!readonly && (
+        <div className={styles.inputArea}>
+          {replyTo && (
+            <div className={styles.replyingTo}>
+              <span>Replying to thread</span>
+              <button
+                className={styles.entryActionButton}
+                onClick={() => setReplyTo(null)}
+              >
+                Cancel
+              </button>
             </div>
           )}
-        </>
-      }
+          {mentionQuery !== null && filteredMembers.length > 0 && (
+            <div className={styles.mentionMenu}>
+              {filteredMembers.map((m: Member, idx: number) => (
+                <div
+                  key={m.id}
+                  className={styles.mentionItem}
+                  data-active={idx === activeMentionIdx ? 'true' : 'false'}
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    insertMention(m);
+                  }}
+                >
+                  {m.name ?? m.email ?? m.id}
+                </div>
+              ))}
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            className={styles.textarea}
+            placeholder="Add an update… use @ to mention. ⌘/Ctrl+Enter to send."
+            value={draft}
+            onChange={onDraftChange}
+            onKeyDown={onDraftKeyDown}
+          />
+          <div className={styles.footerRow}>
+            <span>
+              {lastEntry
+                ? `${entryCount} entries · last ${formatRelativeTime(
+                    lastEntry.timestamp
+                  )}`
+                : 'No entries yet'}
+            </span>
+            <button
+              className={styles.submitButton}
+              disabled={!draft.trim()}
+              onClick={submit}
+            >
+              {replyTo ? 'Reply' : 'Add'}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <PropertyValue
+      className={styles.triggerContainer}
+      isEmpty={entryCount === 0}
+      readonly={readonly}
+      onClick={() => setOpen(true)}
     >
-      <PropertyValue className={styles.triggerContainer}>
-        <CommentIcon />
-        <span className={styles.triggerCount}>{entryCount}</span>
-        <span className={styles.triggerSnippet}>{triggerSnippet}</span>
-      </PropertyValue>
-    </Menu>
+      <CommentIcon />
+      <span className={styles.triggerCount}>{entryCount}</span>
+      <span className={styles.triggerSnippet}>{triggerSnippet}</span>
+      <Menu
+        rootOptions={{ open, onOpenChange: setOpen, modal: true }}
+        contentOptions={{
+          sideOffset: 4,
+          align: 'start',
+          className: styles.popoverRoot,
+        }}
+        items={popoverContent}
+      >
+        <span className={styles.menuAnchor} aria-hidden />
+      </Menu>
+    </PropertyValue>
   );
 };
 

@@ -10,6 +10,13 @@ export const triggerContainer = style({
   cursor: 'pointer',
   fontSize: 13,
   color: cssVarV2('text/secondary'),
+  position: 'relative',
+});
+
+export const menuAnchor = style({
+  position: 'absolute',
+  inset: 0,
+  pointerEvents: 'none',
 });
 
 export const triggerCount = style({
