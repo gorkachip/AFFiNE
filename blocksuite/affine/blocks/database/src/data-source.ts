@@ -82,6 +82,25 @@ export class DatabaseBlockDataSource extends DataSourceBase {
         return model ? model.props['meta:createdBy'] : null;
       },
     },
+    'updated-by': {
+      valueSet: () => {},
+      valueGet: (rowId: string) => {
+        const model = this.getModelById(rowId) as
+          | ParagraphBlockModel
+          | undefined;
+        return model
+          ? (model.props['meta:updatedBy'] ?? model.props['meta:createdBy'])
+          : null;
+      },
+    },
+    'updated-time': {
+      valueSet: () => {},
+      valueGet: (rowId: string) => {
+        const model = this.getModelById(rowId) as ParagraphBlockModel;
+        if (!model) return null;
+        return model.props['meta:updatedAt'] ?? model.props['meta:createdAt'];
+      },
+    },
     type: {
       valueSet: () => {},
       valueGet: (rowId: string) => {
