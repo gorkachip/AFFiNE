@@ -42,6 +42,11 @@ export type WorkspacePropertyTypes = {
   edgelessTheme: { filter: 'is' | 'is-not' };
   pageWidth: { filter: 'is' | 'is-not' };
   template: { filter: 'is' | 'is-not' };
+  // MOJO Activity Log: stored as JSON-stringified ActivityLogValue (entries +
+  // optional thread replies). Filter narrows by mention or text contains.
+  activityLog: {
+    filter: 'mentions' | 'contains' | 'is-not-empty' | 'is-empty';
+  };
   unknown: { filter: never };
 };
 export type WorkspacePropertyType = keyof WorkspacePropertyTypes;

@@ -23,6 +23,11 @@ import {
 import type { DocListPropertyProps, GroupHeaderProps } from '../explorer/types';
 import type { PropertyValueProps } from '../properties/types';
 import {
+  ActivityLogDocListProperty,
+  ActivityLogGroupHeader,
+  ActivityLogValueRenderer,
+} from './activity-log';
+import {
   CheckboxDocListProperty,
   CheckboxFilterValue,
   CheckboxGroupHeader,
@@ -367,6 +372,24 @@ export const WorkspacePropertyTypes = {
     },
     filterValue: TemplateFilterValue,
     defaultFilter: { method: 'is', value: 'true' },
+  },
+  activityLog: {
+    icon: PropertyIcon,
+    value: ActivityLogValueRenderer,
+    name: 'MOJO Activity Log',
+    description: 'Threaded activity feed with @mentions and timestamps.',
+    allowInGroupBy: true,
+    allowInOrderBy: false,
+    showInDocList: 'stack',
+    docListProperty: ActivityLogDocListProperty,
+    groupHeader: ActivityLogGroupHeader,
+    filterMethod: {
+      mentions: 'Mentions',
+      contains: 'Contains',
+      'is-not-empty': 'Has activity',
+      'is-empty': 'Has no activity',
+    },
+    defaultFilter: { method: 'is-not-empty' },
   },
   unknown: {
     icon: PropertyIcon,
