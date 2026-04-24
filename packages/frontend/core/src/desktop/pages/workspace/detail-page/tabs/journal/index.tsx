@@ -10,7 +10,11 @@ import {
 } from '@affine/component';
 import { Guard } from '@affine/core/components/guard';
 import { MoveToTrash } from '@affine/core/components/page-list';
-import { WorkspaceServerService } from '@affine/core/modules/cloud';
+import {
+  AuthService,
+  WorkspaceServerService,
+} from '@affine/core/modules/cloud';
+import { DeadlineIndexService } from '@affine/core/modules/deadline';
 import {
   type DocRecord,
   DocService,
@@ -19,6 +23,7 @@ import {
 import { DocDisplayMetaService } from '@affine/core/modules/doc-display-meta';
 import { IntegrationService } from '@affine/core/modules/integration';
 import { JournalService } from '@affine/core/modules/journal';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import {
   ViewService,
   WorkbenchLink,
@@ -297,8 +302,96 @@ export const EditorJournalPanel = () => {
       <JournalTemplateOnboarding />
       <JournalConflictBlock date={selectedDate} />
       <CalendarEvents date={selectedDate} />
+      <JournalDeadlinesBlock date={selectedDate} />
       <JournalDailyCountBlock date={selectedDate} />
       <JournalTemplateSetting />
+    </div>
+  );
+};
+
+// MOJO: list of kanban-card deadlines that are still pending and reach
+// or pass the journal day being viewed. Shows on every day from "today"
+// through the deadline so it acts as a recurring reminder. Filter is the
+// same one /deadlines uses (creator OR assigned member; admins see all).
+const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
+  const t = useI18n();
+  const deadlineIndex = useService(DeadlineIndexService);
+  const authService = useService(AuthService);
+  const permissionService = useService(WorkspacePermissionService);
+  const workbench = useService(WorkbenchService).workbench;
+  const all = useLiveData(deadlineIndex.deadlines$);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+  const isOwnerOrAdmin = useLiveData(
+    permissionService.permission.isOwnerOrAdmin$
+  );
+
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+  const dayStart = useMemo(() => {
+    return date.startOf('day').valueOf();
+  }, [date]);
+
+  const items = useMemo(() => {
+    const filtered = all.filter(entry => {
+      if (entry.deadline < todayStart) return false;
+      const deadlineDayStart = new Date(entry.deadline);
+      deadlineDayStart.setHours(0, 0, 0, 0);
+      if (dayStart > deadlineDayStart.getTime()) return false;
+      if (dayStart < todayStart) return false;
+      if (isOwnerOrAdmin) return true;
+      if (!currentUserId) return false;
+      return (
+        entry.createdBy === currentUserId ||
+        entry.memberIds.includes(currentUserId)
+      );
+    });
+    return filtered.sort((a, b) => a.deadline - b.deadline);
+  }, [all, todayStart, dayStart, isOwnerOrAdmin, currentUserId]);
+
+  if (items.length === 0) return null;
+
+  const dateText = (entry: { deadline: number }) => {
+    const dl = dayjs(entry.deadline);
+    const diff = dl.startOf('day').diff(date.startOf('day'), 'day');
+    if (diff === 0) return 'due today';
+    if (diff === 1) return 'due tomorrow';
+    return `due in ${diff} days`;
+  };
+
+  return (
+    <div className={styles.dailyCountContainer}>
+      <header className={styles.dailyCountHeader}>
+        {t['Deadlines']?.() ?? 'Deadlines'}
+        <CountDisplay count={items.length} />
+      </header>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {items.map(entry => (
+          <div
+            key={entry.id}
+            className={styles.pageItem}
+            role="button"
+            tabIndex={0}
+            onClick={() => workbench.openDoc(entry.docId, { at: 'active' })}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                workbench.openDoc(entry.docId, { at: 'active' });
+              }
+            }}
+          >
+            <div className={styles.pageItemLabel}>
+              {entry.title || 'Untitled card'}
+            </div>
+            <div style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.6 }}>
+              {dateText(entry)}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
