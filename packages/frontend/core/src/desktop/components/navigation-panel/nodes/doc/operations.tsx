@@ -11,9 +11,13 @@ import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-ap
 import { useBlockSuiteMetaHelper } from '@affine/core/components/hooks/affine/use-block-suite-meta-helper';
 import { useAsyncCallback } from '@affine/core/components/hooks/affine-async-hooks';
 import { IsFavoriteIcon } from '@affine/core/components/pure/icons';
+import { AuthService } from '@affine/core/modules/cloud';
 import { DocsService } from '@affine/core/modules/doc';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
-import { GuardService } from '@affine/core/modules/permissions';
+import {
+  GuardService,
+  WorkspacePermissionService,
+} from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
@@ -46,17 +50,34 @@ export const useNavigationPanelDocNodeOperations = (
     docsService,
     compatibleFavoriteItemsAdapter,
     guardService,
+    authService,
+    workspacePermissionService,
   } = useServices({
     DocsService,
     WorkbenchService,
     WorkspaceService,
     CompatibleFavoriteItemsAdapter,
     GuardService,
+    AuthService,
+    WorkspacePermissionService,
   });
   const { openConfirmModal } = useConfirmModal();
 
   const [addLinkedPageLoading, setAddLinkedPageLoading] = useState(false);
   const docRecord = useLiveData(docsService.list.doc$(docId));
+  const docCreatedBy = useLiveData(docRecord?.createdBy$);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+  const isOwnerOrAdmin = useLiveData(
+    workspacePermissionService.permission.isOwnerOrAdmin$
+  );
+  // MOJO: a doc can be moved to trash only by its creator or by a
+  // workspace owner/admin. Collaborators editing someone else's doc
+  // cannot delete it.
+  const canDelete =
+    !!isOwnerOrAdmin ||
+    (!!currentUserId && !!docCreatedBy && currentUserId === docCreatedBy);
   const { appSettings } = useAppSettingHelper();
 
   const { createPage } = usePageHelper(
@@ -246,27 +267,32 @@ export const useNavigationPanelDocNodeOperations = (
         index: 9999,
         view: <MenuSeparator key="menu-separator" />,
       },
-      {
-        index: 10000,
-        view: (
-          <Guard docId={docId} permission="Doc_Trash">
-            {canMoveToTrash => (
-              <MenuItem
-                type={'danger'}
-                prefixIcon={<DeleteIcon />}
-                onClick={handleMoveToTrash}
-                disabled={!canMoveToTrash}
-              >
-                {t['com.affine.moveToTrash.title']()}
-              </MenuItem>
-            )}
-          </Guard>
-        ),
-      },
+      ...(canDelete
+        ? [
+            {
+              index: 10000,
+              view: (
+                <Guard docId={docId} permission="Doc_Trash">
+                  {canMoveToTrash => (
+                    <MenuItem
+                      type={'danger'}
+                      prefixIcon={<DeleteIcon />}
+                      onClick={handleMoveToTrash}
+                      disabled={!canMoveToTrash}
+                    >
+                      {t['com.affine.moveToTrash.title']()}
+                    </MenuItem>
+                  )}
+                </Guard>
+              ),
+            },
+          ]
+        : []),
     ],
     [
       addLinkedPageLoading,
       appSettings.showLinkedDocInSidebar,
+      canDelete,
       docId,
       favorite,
       handleAddLinkedPage,
