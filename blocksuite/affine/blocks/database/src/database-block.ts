@@ -140,13 +140,23 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
               };
             }
           ).__mojoAuthContext;
-          if (!auth?.isOwnerOrAdmin) return [];
+          if (!auth) return [];
           const ds = this.dataSource.value;
-          const trashedIds = ds.trashedRows$.value;
-          if (trashedIds.length === 0) return [];
-          // Newest-trashed first so admins see the most recent mistakes
-          // at the top.
-          const sorted = [...trashedIds].sort((a, b) => {
+          const allTrashed = ds.trashedRows$.value;
+          if (allTrashed.length === 0) return [];
+          // Non-admins only see trashed cards they created themselves so
+          // they can undo their own accidental deletes; admins see all.
+          const visibleIds = auth.isOwnerOrAdmin
+            ? allTrashed
+            : allTrashed.filter(id => {
+                const m = ds.doc.getBlock(id)?.model as
+                  | { props?: { 'meta:createdBy'?: string } }
+                  | undefined;
+                return m?.props?.['meta:createdBy'] === auth.userId;
+              });
+          if (visibleIds.length === 0) return [];
+          // Newest-trashed first.
+          const sorted = [...visibleIds].sort((a, b) => {
             const ta = (
               ds.doc.getBlock(a)?.model as
                 | { props?: { 'meta:trashedAt'?: number } }
@@ -159,31 +169,35 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
             )?.props?.['meta:trashedAt'];
             return (tb ?? 0) - (ta ?? 0);
           });
+          const canPermaDelete = auth.isOwnerOrAdmin;
+          const bulkActions = [
+            menu.action({
+              prefix: ResetIcon(),
+              name: 'Restore all',
+              select: () => {
+                ds.rowRestore([...sorted]);
+              },
+            }),
+            ...(canPermaDelete
+              ? [
+                  menu.action({
+                    prefix: DeleteIcon(),
+                    class: { 'delete-item': true },
+                    name: 'Empty trash',
+                    select: () => {
+                      ds.rowPermaDelete([...sorted]);
+                    },
+                  }),
+                ]
+              : []),
+          ];
           return [
             menu.subMenu({
               name: `Trash (${sorted.length})`,
               prefix: DeleteIcon(),
               options: {
                 items: [
-                  menu.group({
-                    items: [
-                      menu.action({
-                        prefix: ResetIcon(),
-                        name: 'Restore all',
-                        select: () => {
-                          ds.rowRestore([...sorted]);
-                        },
-                      }),
-                      menu.action({
-                        prefix: DeleteIcon(),
-                        class: { 'delete-item': true },
-                        name: 'Empty trash',
-                        select: () => {
-                          ds.rowPermaDelete([...sorted]);
-                        },
-                      }),
-                    ],
-                  }),
+                  menu.group({ items: bulkActions }),
                   ...sorted.map(rowId => {
                     const model = ds.doc.getBlock(rowId)?.model as
                       | {
@@ -197,27 +211,30 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                     const trashedAt = model?.props?.['meta:trashedAt'];
                     const ago = trashedAt ? formatTrashAgo(trashedAt) : '';
                     const label = `${text.length > 36 ? `${text.slice(0, 36)}…` : text}${ago ? `  ·  ${ago}` : ''}`;
+                    const rowActions = [
+                      menu.action({
+                        prefix: ResetIcon(),
+                        name: 'Restore',
+                        select: () => {
+                          ds.rowRestore([rowId]);
+                        },
+                      }),
+                      ...(canPermaDelete
+                        ? [
+                            menu.action({
+                              prefix: DeleteIcon(),
+                              class: { 'delete-item': true },
+                              name: 'Delete forever',
+                              select: () => {
+                                ds.rowPermaDelete([rowId]);
+                              },
+                            }),
+                          ]
+                        : []),
+                    ];
                     return menu.subMenu({
                       name: label,
-                      options: {
-                        items: [
-                          menu.action({
-                            prefix: ResetIcon(),
-                            name: 'Restore',
-                            select: () => {
-                              ds.rowRestore([rowId]);
-                            },
-                          }),
-                          menu.action({
-                            prefix: DeleteIcon(),
-                            class: { 'delete-item': true },
-                            name: 'Delete forever',
-                            select: () => {
-                              ds.rowPermaDelete([rowId]);
-                            },
-                          }),
-                        ],
-                      },
+                      options: { items: rowActions },
                     });
                   }),
                 ],

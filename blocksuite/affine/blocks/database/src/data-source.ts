@@ -665,15 +665,25 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     });
   }
 
-  // MOJO: admin-only — restore a previously trashed row back to the
-  // visible kanban.
+  // MOJO: restore a previously trashed row. Allowed for the original
+  // creator (so they can undo their own accidental deletes) and for
+  // workspace owners/admins.
   rowRestore(ids: string[]): void {
+    const auth = getMojoAuth();
     this.doc.captureSync();
     this.doc.transact(() => {
       for (const id of ids) {
         const block = this.doc.getBlock(id);
         const model = block?.model as ParagraphBlockModel | undefined;
         if (!model) continue;
+        if (auth && !auth.isOwnerOrAdmin) {
+          const createdBy = model.props['meta:createdBy'];
+          if (createdBy && createdBy !== auth.userId) {
+            throw new Error(
+              'Only the card creator or a workspace admin can restore this card.'
+            );
+          }
+        }
         if (model.keys.includes('meta:trashed')) {
           model.props['meta:trashed'] = undefined;
           model.props['meta:trashedAt'] = undefined;
@@ -682,9 +692,14 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     });
   }
 
-  // MOJO: admin-only — permanently delete a trashed row. Bypasses the
-  // soft-delete logic by going through deleteRows + the framework store.
+  // MOJO: admin-only — permanently delete a trashed row. The hard-delete
+  // is irreversible, so we keep this gated to workspace owners/admins
+  // even if the caller created the row.
   rowPermaDelete(ids: string[]): void {
+    const auth = getMojoAuth();
+    if (auth && !auth.isOwnerOrAdmin) {
+      throw new Error('Only a workspace admin can permanently delete a card.');
+    }
     this.doc.captureSync();
     for (const id of ids) {
       const block = this.doc.getBlock(id);
