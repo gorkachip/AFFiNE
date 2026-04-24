@@ -41,6 +41,7 @@ import {
   CommentIcon,
   CopyIcon,
   DeleteIcon,
+  ExpandFullIcon,
   MoreHorizontalIcon,
   ResetIcon,
 } from '@blocksuite/icons/lit';
@@ -212,6 +213,17 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                     const ago = trashedAt ? formatTrashAgo(trashedAt) : '';
                     const label = `${text.length > 36 ? `${text.slice(0, 36)}…` : text}${ago ? `  ·  ${ago}` : ''}`;
                     const rowActions = [
+                      menu.action({
+                        prefix: ExpandFullIcon(),
+                        name: 'View',
+                        select: () => {
+                          const view = ds.viewManager.currentView$.value;
+                          if (!view) return;
+                          popSideDetail(
+                            this.createTemplate({ view, rowId }, () => {})
+                          ).catch(console.error);
+                        },
+                      }),
                       menu.action({
                         prefix: ResetIcon(),
                         name: 'Restore',
