@@ -47,8 +47,18 @@ const styles = css`
   }
 
   affine-data-view-kanban-card .card-header-title {
-    font-weight: 600;
+    font-family: 'Lacquer', cursive;
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 1.2;
     color: #27241e;
+    letter-spacing: 0.3px;
+  }
+
+  affine-data-view-kanban-card .card-header-title input,
+  affine-data-view-kanban-card .card-header-title textarea {
+    font-family: 'Lacquer', cursive;
+    color: inherit;
   }
 
   .card-header.has-divider {
