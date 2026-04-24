@@ -19,7 +19,24 @@ export type Tag = {
   createDate?: number | Date | undefined;
   updateDate?: number | Date | undefined;
   parentId?: string | undefined;
+  /** MOJO: workspace user id of the collaborator who created this tag. */
+  createdBy?: string;
 };
+
+type MojoAuthContext = {
+  userId: string | null;
+  isOwnerOrAdmin: boolean;
+};
+function getMojoAuth(): MojoAuthContext | undefined {
+  return (globalThis as unknown as { __mojoAuthContext?: MojoAuthContext })
+    .__mojoAuthContext;
+}
+function notifyDeleteBlocked(message: string): void {
+  if (typeof document === 'undefined' || !document.dispatchEvent) return;
+  document.dispatchEvent(
+    new CustomEvent('mojo-delete-blocked', { detail: { message } })
+  );
+}
 
 export class TagStore extends Store {
   get properties() {
@@ -61,6 +78,9 @@ export class TagStore extends Store {
 
   createNewTag(value: string, color: string) {
     const newId = nanoid();
+    // MOJO: stamp the creator so removeTagOption can gate deletes by
+    // creator-or-admin.
+    const auth = getMojoAuth();
     this.updateTagOptions([
       ...this.tagOptions$.value,
       {
@@ -69,6 +89,7 @@ export class TagStore extends Store {
         color,
         createDate: Date.now(),
         updateDate: Date.now(),
+        createdBy: auth?.userId ?? undefined,
       },
     ]);
     return newId;
@@ -96,6 +117,19 @@ export class TagStore extends Store {
   };
 
   removeTagOption = (id: string) => {
+    // MOJO: only the tag's creator (or workspace owner/admin) can remove
+    // it. Same rule we apply to docs / folders / database properties.
+    const auth = getMojoAuth();
+    if (auth && !auth.isOwnerOrAdmin) {
+      const tag = this.tagOptions$.value.find(o => o.id === id);
+      const createdBy = tag?.createdBy;
+      if (createdBy && createdBy !== auth.userId) {
+        const msg =
+          'Only the tag creator or a workspace admin can delete this tag.';
+        notifyDeleteBlocked(msg);
+        throw new Error(msg);
+      }
+    }
     this.workspaceService.workspace.docCollection.doc.transact(() => {
       this.updateTagOptions(this.tagOptions$.value.filter(o => o.id !== id));
       // need to remove tag from all pages
