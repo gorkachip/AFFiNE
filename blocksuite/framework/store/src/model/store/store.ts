@@ -964,26 +964,55 @@ export class Store {
       const target = this.getBlock(targetId)?.model as
         | (BlockModel & { props?: Record<string, unknown>; keys?: string[] })
         | undefined;
-      const props = (target?.props ?? {}) as Record<string, unknown>;
-      const keys = (target?.keys ?? []) as string[];
-      const createdBy =
-        keys.includes('meta:createdBy') &&
-        typeof props['meta:createdBy'] === 'string'
-          ? (props['meta:createdBy'] as string)
-          : undefined;
-      if (createdBy && createdBy !== ctx.userId) {
+      // Walk the block + every descendant. If any of them has a
+      // meta:createdBy that doesn't belong to the caller, block the whole
+      // operation. Without this scan a non-admin could delete a container
+      // (e.g. a database) that they didn't author by relying on the
+      // container itself being legacy (no createdBy) — the framework
+      // would happily wipe the descendants while only emitting per-child
+      // toasts.
+      const offendingChild = (() => {
+        if (!target) return undefined;
+        const stack: Array<typeof target> = [target];
+        while (stack.length) {
+          const node = stack.pop();
+          if (!node) continue;
+          const nodeProps = (node.props ?? {}) as Record<string, unknown>;
+          const nodeKeys = (node.keys ?? []) as string[];
+          const owner =
+            nodeKeys.includes('meta:createdBy') &&
+            typeof nodeProps['meta:createdBy'] === 'string'
+              ? (nodeProps['meta:createdBy'] as string)
+              : undefined;
+          if (owner && owner !== ctx.userId) {
+            return { id: node.id, createdBy: owner };
+          }
+          for (const child of node.children ?? []) {
+            stack.push(child as typeof target);
+          }
+        }
+        return undefined;
+      })();
+      if (offendingChild) {
         // Silent block — throwing here would crash framework-internal
         // delete paths (e.g. backspace on an empty paragraph created by
         // someone else). The user-facing delete actions in the database
         // data-source surface the gate explicitly with a thrown error.
-        console.warn('[mojo] blocked delete of block created by another user', {
-          blockId: targetId,
-          createdBy,
-        });
+        console.warn(
+          '[mojo] blocked delete of block tree owned by another user',
+          {
+            blockId: targetId,
+            offendingId: offendingChild.id,
+            createdBy: offendingChild.createdBy,
+          }
+        );
         if (typeof document !== 'undefined' && document.dispatchEvent) {
           document.dispatchEvent(
             new CustomEvent('mojo-delete-blocked', {
-              detail: { blockId: targetId, createdBy },
+              detail: {
+                blockId: targetId,
+                createdBy: offendingChild.createdBy,
+              },
             })
           );
         }
