@@ -35,10 +35,38 @@ export class WorkspacePropertyService extends Service {
   createProperty(
     properties: Omit<DocCustomPropertyInfo, 'id'> & { id?: string }
   ) {
-    return this.workspacePropertiesStore.createWorkspaceProperty(properties);
+    // MOJO: stamp the creator so removeProperty can gate later. Skipped if
+    // the auth context isn't ready yet (e.g. during early app boot).
+    const ctx = (
+      globalThis as unknown as {
+        __mojoAuthContext?: { userId: string | null; isOwnerOrAdmin: boolean };
+      }
+    ).__mojoAuthContext;
+    const withCreator =
+      ctx?.userId && !properties.createdBy
+        ? { ...properties, createdBy: ctx.userId }
+        : properties;
+    return this.workspacePropertiesStore.createWorkspaceProperty(withCreator);
   }
 
   removeProperty(id: string) {
+    // MOJO: only the property's creator (or workspace owner/admin) can
+    // remove it. Mirrors the same rule we apply to docs, folders and
+    // database columns.
+    const ctx = (
+      globalThis as unknown as {
+        __mojoAuthContext?: { userId: string | null; isOwnerOrAdmin: boolean };
+      }
+    ).__mojoAuthContext;
+    if (ctx && !ctx.isOwnerOrAdmin) {
+      const info = this.properties$.value.find(p => p.id === id);
+      const createdBy = info?.createdBy;
+      if (createdBy && createdBy !== ctx.userId) {
+        throw new Error(
+          'Only the property creator or a workspace admin can remove this property.'
+        );
+      }
+    }
     this.workspacePropertiesStore.removeWorkspaceProperty(id);
   }
 

@@ -22,4 +22,6 @@ export type ViewBasicDataType = {
   id: string;
   name: string;
   mode: string;
+  /** MOJO: workspace user id of the collaborator who created this view. */
+  createdBy?: string;
 };

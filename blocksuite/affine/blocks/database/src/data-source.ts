@@ -699,14 +699,32 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   viewDataAdd(viewData: DataViewDataType): string {
+    // MOJO: stamp the view's creator so collaborators can't drop views
+    // built by others.
+    const auth = getMojoAuth();
+    const stamped: DataViewDataType =
+      auth?.userId && !viewData.createdBy
+        ? { ...viewData, createdBy: auth.userId }
+        : viewData;
     this._model.store.captureSync();
     this._model.store.transact(() => {
-      this._model.props.views = [...this._model.props.views, viewData];
+      this._model.props.views = [...this._model.props.views, stamped];
     });
-    return viewData.id;
+    return stamped.id;
   }
 
   viewDataDelete(viewId: string): void {
+    // MOJO: gate by view creator unless caller is workspace owner/admin.
+    const auth = getMojoAuth();
+    if (auth && !auth.isOwnerOrAdmin) {
+      const view = this._model.props.views$.value.find(v => v.id === viewId);
+      const createdBy = view?.createdBy;
+      if (createdBy && createdBy !== auth.userId) {
+        throw new Error(
+          'Only the view creator or a workspace admin can delete this view.'
+        );
+      }
+    }
     this._model.store.captureSync();
     deleteView(this._model, viewId);
   }

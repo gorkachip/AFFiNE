@@ -53,6 +53,12 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     icon: f.string().optional(),
     additionalData: f.json().optional(),
     isDeleted: f.boolean().optional(),
+    /**
+     * MOJO: workspace user id of the collaborator who added this property
+     * type. Used to gate removeProperty so collaborators cannot drop
+     * property types added by others.
+     */
+    createdBy: f.string().optional(),
     // we will keep deleted properties in the database, for override legacy data
   },
   pinnedCollections: {
