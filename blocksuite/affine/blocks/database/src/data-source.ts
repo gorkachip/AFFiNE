@@ -70,6 +70,17 @@ function getMojoAuth(): MojoAuthContext | undefined {
     .__mojoAuthContext;
 }
 
+// MOJO: notify the React shell so it can pop a toast. Used alongside a
+// thrown Error inside the gate so the user gets an explanation even if
+// the upstream caller swallows the exception (most BlockSuite handlers
+// just log the throw and continue silently).
+function notifyDeleteBlocked(message: string): void {
+  if (typeof document === 'undefined' || !document.dispatchEvent) return;
+  document.dispatchEvent(
+    new CustomEvent('mojo-delete-blocked', { detail: { message } })
+  );
+}
+
 // MOJO: read the meta:trashed flag through the prop's reactive signal
 // when available so any computed that depends on it re-runs on changes.
 function isRowTrashed(model: ParagraphBlockModel): boolean {
@@ -505,9 +516,10 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       const column = this._model.props.columns[index];
       const createdBy = column?.createdBy;
       if (createdBy && createdBy !== auth.userId) {
-        throw new Error(
-          'Only the column creator or a workspace admin can delete this property.'
-        );
+        const msg =
+          'Only the column creator or a workspace admin can delete this property.';
+        notifyDeleteBlocked(msg);
+        throw new Error(msg);
       }
     }
 
@@ -648,9 +660,10 @@ export class DatabaseBlockDataSource extends DataSourceBase {
         if (auth && !auth.isOwnerOrAdmin) {
           const createdBy = model.props['meta:createdBy'];
           if (createdBy && createdBy !== auth.userId) {
-            throw new Error(
-              'Only the card creator or a workspace admin can delete this card.'
-            );
+            const msg =
+              'Only the card creator or a workspace admin can delete this card.';
+            notifyDeleteBlocked(msg);
+            throw new Error(msg);
           }
         }
         if (model.keys.includes('meta:trashed')) {
@@ -679,9 +692,10 @@ export class DatabaseBlockDataSource extends DataSourceBase {
         if (auth && !auth.isOwnerOrAdmin) {
           const createdBy = model.props['meta:createdBy'];
           if (createdBy && createdBy !== auth.userId) {
-            throw new Error(
-              'Only the card creator or a workspace admin can restore this card.'
-            );
+            const msg =
+              'Only the card creator or a workspace admin can restore this card.';
+            notifyDeleteBlocked(msg);
+            throw new Error(msg);
           }
         }
         if (model.keys.includes('meta:trashed')) {
@@ -698,7 +712,9 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   rowPermaDelete(ids: string[]): void {
     const auth = getMojoAuth();
     if (auth && !auth.isOwnerOrAdmin) {
-      throw new Error('Only a workspace admin can permanently delete a card.');
+      const msg = 'Only a workspace admin can permanently delete a card.';
+      notifyDeleteBlocked(msg);
+      throw new Error(msg);
     }
     this.doc.captureSync();
     for (const id of ids) {
@@ -744,9 +760,10 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       const view = this._model.props.views$.value.find(v => v.id === viewId);
       const createdBy = view?.createdBy;
       if (createdBy && createdBy !== auth.userId) {
-        throw new Error(
-          'Only the view creator or a workspace admin can delete this view.'
-        );
+        const msg =
+          'Only the view creator or a workspace admin can delete this view.';
+        notifyDeleteBlocked(msg);
+        throw new Error(msg);
       }
     }
     this._model.store.captureSync();

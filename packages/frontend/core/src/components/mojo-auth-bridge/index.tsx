@@ -33,18 +33,23 @@ export const MojoAuthBridge = () => {
     };
   }, [userId, isOwnerOrAdmin]);
 
-  // Surface silent framework-level delete blocks as a user-visible toast.
-  // Throttled to one toast per second so a backspace-spam doesn't flood
-  // the screen with duplicates.
+  // Surface gate-blocked actions (silent framework deletes, kanban
+  // row/column/view delete throws, etc.) as a user-visible toast. The
+  // dispatcher can pass a specific message via event.detail.message so
+  // we can show "Only the column creator..." vs "Only the card
+  // creator..." instead of one generic text. Throttled to one toast per
+  // second so a backspace-spam doesn't flood the screen with duplicates.
   useEffect(() => {
     let last = 0;
-    const handler = () => {
+    const handler = (event: Event) => {
       const now = Date.now();
       if (now - last < 1000) return;
       last = now;
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
       notify.error({
         title: 'Cannot delete',
         message:
+          detail?.message ||
           'Only the creator or a workspace admin can delete this item. Ask an admin if you need it gone.',
       });
     };
