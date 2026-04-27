@@ -1,7 +1,8 @@
-import { LiveData, Service } from '@toeverything/infra';
+import { LiveData, OnEvent, Service } from '@toeverything/infra';
 import { map } from 'rxjs';
 
 import type { WorkspaceDBService } from '../../db';
+import { type Workspace, WorkspaceInitialized } from '../../workspace';
 
 export interface DeadlineEntry {
   id: string; // `${docId}:${rowId}`
@@ -18,8 +19,19 @@ export interface DeadlineEntry {
  * Written by the BlockSuite database data-source through a small global
  * bridge (`globalThis.__mojoDeadlineIndex`) so the vendored database block
  * doesn't need to import AFFiNE services.
+ *
+ * Eagerly instantiated on workspace init so the bridge is in place before
+ * the user opens any kanban — otherwise edits done during the cold path
+ * silently no-op against an undefined bridge.
  */
+@OnEvent(WorkspaceInitialized, i => i.onWorkspaceInitialized)
 export class DeadlineIndexService extends Service {
+  onWorkspaceInitialized(_workspace: Workspace) {
+    // Bridge is installed in the constructor; this hook just guarantees
+    // the service gets created even when nothing has called useService
+    // for it yet.
+  }
+
   constructor(private readonly db: WorkspaceDBService) {
     super();
 

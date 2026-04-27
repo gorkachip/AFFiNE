@@ -269,6 +269,25 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     super();
     this._model = model; // ensure invariants first
     init?.(this); // then allow external initialisation
+    // MOJO: backfill the workspace deadlines index from existing rows
+    // when the data-source is created. Covers cards that had a deadline
+    // set before DeadlineIndexService was alive (initial deploy of the
+    // index, or first time the user opens a kanban after a fresh load).
+    queueMicrotask(() => this._bootstrapDeadlineIndex());
+  }
+
+  private _bootstrapDeadlineIndex(): void {
+    try {
+      const hasDeadlineColumn = this._model.props.columns$.value.some(
+        c => c.type === 'deadline'
+      );
+      if (!hasDeadlineColumn) return;
+      for (const row of this._model.children) {
+        this._syncDeadlineIndex(row.id);
+      }
+    } catch (e) {
+      console.warn('[mojo] deadline bootstrap failed', e);
+    }
   }
 
   private _runCapture() {
