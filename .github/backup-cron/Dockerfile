@@ -1,7 +1,7 @@
 FROM alpine:3.20
 
 RUN apk add --no-cache \
-    postgresql17-client \
+    postgresql16-client \
     aws-cli \
     bash \
     gzip \
