@@ -55,7 +55,7 @@ export class DeadlineIndexService extends Service {
     ).__mojoDeadlineIndex = {
       upsert: entry => {
         const id = `${entry.docId}:${entry.rowId}`;
-         
+
         console.log('[mojo deadline] upsert', id, entry);
         try {
           this.db.db.deadlines.create({
@@ -79,7 +79,6 @@ export class DeadlineIndexService extends Service {
               title: entry.title,
             });
           } catch (updateErr) {
-             
             console.warn('[mojo deadline] upsert failed', {
               createErr,
               updateErr,
@@ -89,7 +88,7 @@ export class DeadlineIndexService extends Service {
       },
       remove: (docId, rowId) => {
         const id = `${docId}:${rowId}`;
-         
+
         console.log('[mojo deadline] remove', id);
         try {
           this.db.db.deadlines.delete(id);
@@ -98,16 +97,20 @@ export class DeadlineIndexService extends Service {
         }
       },
     };
-     
+
     console.log('[mojo deadline] bridge installed', {
       bridge: !!(globalThis as any).__mojoDeadlineIndex,
     });
   }
 
   deadlines$ = LiveData.from<DeadlineEntry[]>(
-    this.db.db.deadlines.find$({}).pipe(
-      map(rows =>
-        rows.map(row => ({
+    // find$() with no filter returns every row; passing {} would be
+    // interpreted as "match every field equals empty" and yield nothing.
+    this.db.db.deadlines.find$().pipe(
+      map(rows => {
+         
+        console.log('[mojo deadline] deadlines$ emit', rows.length, rows);
+        return rows.map(row => ({
           id: row.id,
           docId: row.docId ?? '',
           rowId: row.rowId ?? '',
@@ -115,8 +118,8 @@ export class DeadlineIndexService extends Service {
           createdBy: row.createdBy ?? undefined,
           memberIds: row.memberIds ? safeParseArray(row.memberIds) : [],
           title: row.title ?? '',
-        }))
-      )
+        }));
+      })
     ),
     []
   );
