@@ -55,18 +55,42 @@ export class DeadlineIndexService extends Service {
     ).__mojoDeadlineIndex = {
       upsert: entry => {
         const id = `${entry.docId}:${entry.rowId}`;
-        this.db.db.deadlines.create({
-          id,
-          docId: entry.docId,
-          rowId: entry.rowId,
-          deadline: entry.deadline,
-          createdBy: entry.createdBy,
-          memberIds: JSON.stringify(entry.memberIds),
-          title: entry.title,
-        });
+         
+        console.log('[mojo deadline] upsert', id, entry);
+        try {
+          this.db.db.deadlines.create({
+            id,
+            docId: entry.docId,
+            rowId: entry.rowId,
+            deadline: entry.deadline,
+            createdBy: entry.createdBy,
+            memberIds: JSON.stringify(entry.memberIds),
+            title: entry.title,
+          });
+        } catch (createErr) {
+          // Most likely a duplicate id — try update.
+          try {
+            this.db.db.deadlines.update(id, {
+              docId: entry.docId,
+              rowId: entry.rowId,
+              deadline: entry.deadline,
+              createdBy: entry.createdBy,
+              memberIds: JSON.stringify(entry.memberIds),
+              title: entry.title,
+            });
+          } catch (updateErr) {
+             
+            console.warn('[mojo deadline] upsert failed', {
+              createErr,
+              updateErr,
+            });
+          }
+        }
       },
       remove: (docId, rowId) => {
         const id = `${docId}:${rowId}`;
+         
+        console.log('[mojo deadline] remove', id);
         try {
           this.db.db.deadlines.delete(id);
         } catch {
@@ -74,6 +98,10 @@ export class DeadlineIndexService extends Service {
         }
       },
     };
+     
+    console.log('[mojo deadline] bridge installed', {
+      bridge: !!(globalThis as any).__mojoDeadlineIndex,
+    });
   }
 
   deadlines$ = LiveData.from<DeadlineEntry[]>(

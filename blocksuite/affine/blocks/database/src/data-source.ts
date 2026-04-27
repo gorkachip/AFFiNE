@@ -278,9 +278,15 @@ export class DatabaseBlockDataSource extends DataSourceBase {
 
   private _bootstrapDeadlineIndex(): void {
     try {
-      const hasDeadlineColumn = this._model.props.columns$.value.some(
-        c => c.type === 'deadline'
-      );
+      const cols = this._model.props.columns$.value;
+      const hasDeadlineColumn = cols.some(c => c.type === 'deadline');
+       
+      console.log('[mojo deadline] bootstrap scan', {
+        docId: this._model.store.id,
+        columnTypes: cols.map(c => c.type),
+        rowCount: this._model.children.length,
+        hasDeadlineColumn,
+      });
       if (!hasDeadlineColumn) return;
       for (const row of this._model.children) {
         this._syncDeadlineIndex(row.id);
@@ -379,7 +385,13 @@ export class DatabaseBlockDataSource extends DataSourceBase {
         };
       }
     ).__mojoDeadlineIndex;
-    if (!bridge) return;
+    if (!bridge) {
+       
+      console.warn('[mojo deadline] sync skipped — bridge not installed', {
+        rowId,
+      });
+      return;
+    }
     const docId = this._model.store.id;
     let deadline: number | null = null;
     const memberIds: string[] = [];
