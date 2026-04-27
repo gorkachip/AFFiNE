@@ -314,7 +314,6 @@ export const EditorJournalPanel = () => {
 // through the deadline so it acts as a recurring reminder. Filter is the
 // same one /deadlines uses (creator OR assigned member; admins see all).
 const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
-  const t = useI18n();
   const deadlineIndex = useService(DeadlineIndexService);
   const authService = useService(AuthService);
   const permissionService = useService(WorkspacePermissionService);
@@ -366,30 +365,56 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
   return (
     <div className={styles.dailyCountContainer}>
       <header className={styles.dailyCountHeader}>
-        {t['Deadlines']?.() ?? 'Deadlines'}
+        Deadlines
         <CountDisplay count={items.length} />
       </header>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          padding: '0 4px',
+        }}
+      >
         {items.map(entry => (
-          <div
+          <button
             key={entry.id}
-            className={styles.pageItem}
-            role="button"
-            tabIndex={0}
+            type="button"
             onClick={() => workbench.openDoc(entry.docId, { at: 'active' })}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                workbench.openDoc(entry.docId, { at: 'active' });
-              }
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '8px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--affine-border-color)',
+              background: 'var(--affine-background-primary-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              textAlign: 'left',
             }}
           >
-            <div className={styles.pageItemLabel}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'var(--affine-text-primary-color)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {entry.title || 'Untitled card'}
             </div>
-            <div style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.6 }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--affine-text-secondary-color)',
+              }}
+            >
               {dateText(entry)}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
