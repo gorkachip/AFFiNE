@@ -383,6 +383,52 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     if (type === 'deadline' || type === 'member') {
       this._syncDeadlineIndex(rowId);
     }
+    // MOJO: append an entry to the card activity log so the user can
+    // see who touched what (status changes, member assignments, deadline
+    // moves, etc). Skip our own internal MOJO Activity Log property to
+    // avoid recursion noise.
+    if (type !== 'activity-log') {
+      this._logCardActivity(rowId, propertyId, type, value);
+    }
+  }
+
+  private _logCardActivity(
+    rowId: string,
+    propertyId: string,
+    columnType: string,
+    newValue: unknown
+  ): void {
+    const bridge = (
+      globalThis as unknown as {
+        __mojoCardActivityLog?: {
+          add: (entry: {
+            rowId: string;
+            docId: string;
+            actorId?: string;
+            actorName?: string;
+            action: string;
+            details?: Record<string, unknown>;
+          }) => void;
+        };
+      }
+    ).__mojoCardActivityLog;
+    if (!bridge) return;
+    const auth = getMojoAuth();
+    const column = this._model.props.columns$.value.find(
+      c => c.id === propertyId
+    );
+    const columnName = column?.name ?? columnType;
+    bridge.add({
+      rowId,
+      docId: this._model.store.id,
+      actorId: auth?.userId ?? undefined,
+      action: `Changed ${columnName}`,
+      details: {
+        columnType,
+        columnName,
+        newValue,
+      },
+    });
   }
 
   private _syncDeadlineIndex(rowId: string): void {

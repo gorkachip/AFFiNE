@@ -5,6 +5,7 @@ import {
 } from '@blocksuite/affine-components/context-menu';
 import {
   ArrowRightBigIcon,
+  DateTimeIcon,
   DeleteIcon,
   ExpandFullIcon,
   MoveLeftIcon,
@@ -46,6 +47,23 @@ export const popCardMenu = (
       prefix: ExpandFullIcon(),
       select: () => {
         openDetail(kanbanViewLogic, rowId, selection);
+      },
+    }),
+    // MOJO: opens a per-card chronological activity log modal in the
+    // React shell (cell changes, member assignments, etc.). Lit fires
+    // an event; the React MojoAuthBridge listens and renders the modal.
+    menu.action({
+      name: 'Activity',
+      prefix: DateTimeIcon(),
+      select: () => {
+        if (typeof document === 'undefined' || !document.dispatchEvent) {
+          return;
+        }
+        document.dispatchEvent(
+          new CustomEvent('mojo-card-activity', {
+            detail: { rowId },
+          })
+        );
       },
     }),
     menu.subMenu({

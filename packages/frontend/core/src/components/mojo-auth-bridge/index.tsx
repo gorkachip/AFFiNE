@@ -4,6 +4,8 @@ import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useEffect } from 'react';
 
+import { CardActivityModalListener } from './card-activity-modal';
+
 /**
  * MOJO bridge: keep a tiny global with the current user id and
  * workspace owner/admin flag so low-level entities (DocRecord) can
@@ -57,5 +59,5 @@ export const MojoAuthBridge = () => {
     return () => document.removeEventListener('mojo-delete-blocked', handler);
   }, []);
 
-  return null;
+  return <CardActivityModalListener />;
 };

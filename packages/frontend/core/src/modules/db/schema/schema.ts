@@ -95,6 +95,25 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
      *  without opening the doc. */
     title: f.string().optional(),
   },
+  /**
+   * MOJO: append-only activity log for kanban cards (rows). Surfaced in
+   * a per-card "Activity" modal triggered from the card's "..." menu.
+   * Written automatically by the database data-source whenever a cell
+   * is touched.
+   */
+  cardActivityLog: {
+    id: f.string().primaryKey().optional().default(nanoid),
+    rowId: f.string(),
+    docId: f.string(),
+    timestamp: f.number(),
+    actorId: f.string().optional(),
+    actorName: f.string().optional(),
+    /** Short human-readable headline e.g. "Changed Status", "Renamed". */
+    action: f.string(),
+    /** JSON string with optional metadata (old/new values, column id,
+     *  group keys, etc). */
+    details: f.string().optional(),
+  },
   explorerIcon: {
     /**
      * ${doc|collection|folder|tag}:${id}
