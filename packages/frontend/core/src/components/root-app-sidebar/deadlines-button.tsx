@@ -3,13 +3,11 @@ import { AuthService } from '@affine/core/modules/cloud';
 import { DeadlineIndexService } from '@affine/core/modules/deadline';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
-import { useI18n } from '@affine/i18n';
 import { DateTimeIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useMemo, useState } from 'react';
 
 export const DeadlinesButton = () => {
-  const t = useI18n();
   const globalContextService = useService(GlobalContextService);
   const deadlinesActive = useLiveData(
     globalContextService.globalContext.docId.$.map(id => id === null)
@@ -47,8 +45,7 @@ export const DeadlinesButton = () => {
       to="/deadlines"
     >
       <span data-testid="deadlines-page">
-        {t['com.affine.rootAppSidebar.deadlines']?.() ?? 'Deadlines'}
-        {count > 0 ? ` (${count})` : ''}
+        Deadlines{count > 0 ? ` (${count})` : ''}
       </span>
     </MenuLinkItem>
   );
