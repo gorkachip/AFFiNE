@@ -95,10 +95,12 @@ export const DeadlinesPage = () => {
 
   const handleOpen = useCallback(
     (entry: DeadlineEntry) => {
-      // Navigate to the doc that contains the card. BlockSuite will render
-      // the kanban inside; the user can scroll to the specific row from
-      // there.
-      workbench.openDoc(entry.docId, { at: 'active' });
+      // Pass databaseRowId so BlockSuite's editor opens the doc and
+      // scrolls / highlights the kanban row that owns the deadline.
+      workbench.openDoc(
+        { docId: entry.docId, databaseRowId: entry.rowId },
+        { at: 'active' }
+      );
     },
     [workbench]
   );

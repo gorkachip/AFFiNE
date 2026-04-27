@@ -274,13 +274,29 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     // set before DeadlineIndexService was alive (initial deploy of the
     // index, or first time the user opens a kanban after a fresh load).
     queueMicrotask(() => this._bootstrapDeadlineIndex());
+    // MOJO: re-sync deadline index entries when a row's title (or any
+    // other prop) changes after the initial sync, so the cached title
+    // shown in /deadlines and the journal calendar stays current.
+    this._model.store.slots.blockUpdated.subscribe(payload => {
+      if (payload.type !== 'update') return;
+      const block = this._model.store.getBlock(payload.id);
+      if (!block) return;
+      let parent = block.model.parent;
+      while (parent) {
+        if (parent.id === this._model.id) {
+          this._syncDeadlineIndex(payload.id);
+          return;
+        }
+        parent = parent.parent;
+      }
+    });
   }
 
   private _bootstrapDeadlineIndex(): void {
     try {
       const cols = this._model.props.columns$.value;
       const hasDeadlineColumn = cols.some(c => c.type === 'deadline');
-       
+
       console.log('[mojo deadline] bootstrap scan', {
         docId: this._model.store.id,
         columnTypes: cols.map(c => c.type),
@@ -386,7 +402,6 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       }
     ).__mojoDeadlineIndex;
     if (!bridge) {
-       
       console.warn('[mojo deadline] sync skipped — bridge not installed', {
         rowId,
       });

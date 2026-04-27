@@ -380,7 +380,12 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
           <button
             key={entry.id}
             type="button"
-            onClick={() => workbench.openDoc(entry.docId, { at: 'active' })}
+            onClick={() =>
+              workbench.openDoc(
+                { docId: entry.docId, databaseRowId: entry.rowId },
+                { at: 'active' }
+              )
+            }
             style={{
               all: 'unset',
               cursor: 'pointer',
