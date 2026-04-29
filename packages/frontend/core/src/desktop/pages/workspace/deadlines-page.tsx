@@ -4,7 +4,6 @@ import {
   type DeadlineEntry,
   DeadlineIndexService,
 } from '@affine/core/modules/deadline';
-import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { DateTimeIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
@@ -45,15 +44,11 @@ const BUCKET_ORDER = [
 export const DeadlinesPage = () => {
   const deadlineIndex = useService(DeadlineIndexService);
   const authService = useService(AuthService);
-  const permissionService = useService(WorkspacePermissionService);
   const workbench = useService(WorkbenchService).workbench;
 
   const all = useLiveData(deadlineIndex.deadlines$);
   const currentUserId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
-  );
-  const isOwnerOrAdmin = useLiveData(
-    permissionService.permission.isOwnerOrAdmin$
   );
 
   // Snapshot "now" at mount — the page re-renders often enough (on data
@@ -62,9 +57,6 @@ export const DeadlinesPage = () => {
   const [nowSnapshot] = useState(() => Date.now());
 
   const visible = useMemo(() => {
-    if (isOwnerOrAdmin) {
-      return all.filter(entry => entry.deadline >= nowSnapshot);
-    }
     if (!currentUserId) return [];
     return all.filter(
       entry =>
@@ -72,7 +64,7 @@ export const DeadlinesPage = () => {
         (entry.createdBy === currentUserId ||
           entry.memberIds.includes(currentUserId))
     );
-  }, [all, currentUserId, isOwnerOrAdmin, nowSnapshot]);
+  }, [all, currentUserId, nowSnapshot]);
 
   const grouped = useMemo(() => {
     const todayStart = startOfDay(nowSnapshot);

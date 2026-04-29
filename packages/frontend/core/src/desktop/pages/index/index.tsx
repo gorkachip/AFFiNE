@@ -1,10 +1,7 @@
 import { DefaultServerService } from '@affine/core/modules/cloud';
 import { DesktopApiService } from '@affine/core/modules/desktop-api';
 import { WorkspacesService } from '@affine/core/modules/workspace';
-import {
-  buildShowcaseWorkspace,
-  createFirstAppData,
-} from '@affine/core/utils/first-app-data';
+import { buildShowcaseWorkspace } from '@affine/core/utils/first-app-data';
 import { ServerFeature } from '@affine/graphql';
 import {
   useLiveData,
@@ -151,29 +148,10 @@ export const Component = ({
   }, [desktopApi]);
 
   useEffect(() => {
-    if (listIsLoading || list.length > 0 || !enableLocalWorkspace) {
+    if (listIsLoading) {
       return;
     }
-
-    createFirstAppData(workspacesService)
-      .then(createdWorkspace => {
-        if (createdWorkspace) {
-          if (createdWorkspace.defaultPageId) {
-            jumpToPage(
-              createdWorkspace.meta.id,
-              createdWorkspace.defaultPageId
-            );
-          } else {
-            openPage(createdWorkspace.meta.id, 'all');
-          }
-        }
-      })
-      .catch(err => {
-        console.error('Failed to create first app data', err);
-      })
-      .finally(() => {
-        setCreating(false);
-      });
+    setCreating(false);
   }, [
     jumpToPage,
     jumpToSignIn,
