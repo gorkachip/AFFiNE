@@ -76,12 +76,10 @@ export class BlockMetaService extends StoreExtension {
     this.store.withoutTransact(() => {
       model.props['meta:updatedAt'] = now;
       model.props['meta:updatedBy'] = writer.id;
-      if (!model.props['meta:createdAt']) {
-        model.props['meta:createdAt'] = now;
-      }
-      if (!model.props['meta:createdBy']) {
-        model.props['meta:createdBy'] = writer.id;
-      }
+      // Don't backfill meta:createdAt or meta:createdBy on update —
+      // attributing legacy/imported blocks to whoever happens to edit
+      // them first leaks data into "My Deadlines" and "Created by me"
+      // filters for cards the user didn't actually create.
     });
   };
 
