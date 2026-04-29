@@ -100,6 +100,13 @@ export const dailyCountContainer = style({
   transform:
     'translateX(calc(var(--active-index) * 100% / var(--item-count) * -1))',
 });
+
+export const deadlinesBlock = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  padding: '0 4px',
+});
 export const dailyCountItem = style({
   width: 'calc(100% / var(--item-count))',
   height: '100%',

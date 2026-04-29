@@ -357,7 +357,7 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
   };
 
   return (
-    <div className={styles.dailyCountContainer}>
+    <div className={styles.deadlinesBlock}>
       <header className={styles.dailyCountHeader}>
         Deadlines
         <CountDisplay count={items.length} />
