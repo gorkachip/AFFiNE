@@ -362,14 +362,7 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
         Deadlines
         <CountDisplay count={items.length} />
       </header>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-          padding: '0 4px',
-        }}
-      >
+      <div className={styles.deadlinesBlockList}>
         {items.map(entry => (
           <button
             key={entry.id}

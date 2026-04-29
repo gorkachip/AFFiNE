@@ -106,6 +106,21 @@ export const deadlinesBlock = style({
   flexDirection: 'column',
   gap: 8,
   padding: '0 4px',
+  // Cap the height of the block so a long list doesn't push the
+  // Created/Updated section out of the journal panel's viewport.
+  // Items beyond the cap scroll inside the list rather than overflowing
+  // the panel (which has overflow: hidden).
+  maxHeight: 280,
+});
+
+export const deadlinesBlockList = style({
+  flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  padding: '0 4px',
 });
 export const dailyCountItem = style({
   width: 'calc(100% / var(--item-count))',
