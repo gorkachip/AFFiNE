@@ -37,9 +37,12 @@ export class StaticFilesResolver implements OnModuleInit {
     const rootPath = basePath || '/';
     const staticPath = join(env.projectRoot, 'static');
     const adminPath = join(staticPath, 'admin');
-    const mobilePath = env.namespaces.canary
-      ? join(staticPath, 'mobile')
-      : staticPath;
+    // The Dockerfile always copies the mobile bundle into static/mobile,
+    // and we always want mobile-UA requests to receive it. The original
+    // env.namespaces.canary gate hid the mobile bundle from production
+    // selfhost deployments — drop it so the bundle is served whenever
+    // it's present on disk.
+    const mobilePath = join(staticPath, 'mobile');
 
     const staticAsset = serveStatic(staticPath, {
       redirect: false,
