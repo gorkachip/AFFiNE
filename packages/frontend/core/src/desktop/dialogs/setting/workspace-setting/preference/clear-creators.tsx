@@ -1,12 +1,13 @@
 import { SettingRow } from '@affine/component/setting-components';
 import { ConfirmModal } from '@affine/component/ui/modal';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import {
   type Workspace,
   WorkspaceService,
 } from '@affine/core/modules/workspace';
 import type { DocImpl } from '@affine/core/modules/workspace/impls/doc';
 import { ArrowRightSmallIcon } from '@blocksuite/icons/rc';
-import { useService } from '@toeverything/infra';
+import { useLiveData, useServiceOptional } from '@toeverything/infra';
 import { useCallback, useState } from 'react';
 
 interface CleanupSummary {
@@ -43,12 +44,20 @@ async function clearAllCreators(workspace: Workspace): Promise<CleanupSummary> {
 }
 
 export const ClearCreatorsPanel = () => {
-  const workspace = useService(WorkspaceService).workspace;
+  // useServiceOptional + LiveData fallback so a missing permission service
+  // (e.g., local-only workspace contexts) doesn't blank the whole panel.
+  const workspaceService = useServiceOptional(WorkspaceService);
+  const workspace = workspaceService?.workspace;
+  const permissionService = useServiceOptional(WorkspacePermissionService);
+  const isOwnerOrAdmin = useLiveData(
+    permissionService?.permission.isOwnerOrAdmin$ ?? null
+  );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
 
   const handleConfirm = useCallback(async () => {
+    if (!workspace) return;
     setRunning(true);
     try {
       const summary = await clearAllCreators(workspace);
@@ -63,6 +72,12 @@ export const ClearCreatorsPanel = () => {
       setConfirmOpen(false);
     }
   }, [workspace]);
+
+  // Hide for non-admins. If permission state hasn't resolved yet (null),
+  // also hide — better to show nothing than to flash the button to a
+  // member who shouldn't see it.
+  if (!isOwnerOrAdmin) return null;
+  if (!workspace) return null;
 
   return (
     <>
