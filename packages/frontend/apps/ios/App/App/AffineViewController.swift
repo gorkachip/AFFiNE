@@ -15,6 +15,42 @@ class AFFiNEViewController: CAPBridgeViewController {
     intelligentsButton.delegate = self
     self.intelligentsButton = intelligentsButton
     dismissIntelligentsButton()
+
+    // When iOS reclaims the WKWebView's process while the app is in
+    // background, returning to foreground often shows a blank screen
+    // because the WebView never re-renders. Watch the process state
+    // and reload the page once it's terminated.
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleAppDidBecomeActive),
+      name: UIApplication.didBecomeActiveNotification,
+      object: nil
+    )
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  @objc private func handleAppDidBecomeActive() {
+    guard let webView = webView else { return }
+    // The blank-screen case is when iOS killed the WebView process while
+    // the app was backgrounded. Two signals: webView.url goes nil, or
+    // evaluateJavaScript fails because the underlying process is dead.
+    if webView.url == nil {
+      // If we ever lost the URL, reload to the configured server.
+      if let serverURL = bridge?.config.serverURL {
+        webView.load(URLRequest(url: serverURL))
+      } else {
+        webView.reload()
+      }
+      return
+    }
+    webView.evaluateJavaScript("document.readyState") { [weak self] result, error in
+      if error != nil || result == nil {
+        self?.webView?.reload()
+      }
+    }
   }
 
   override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {

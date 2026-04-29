@@ -13,21 +13,29 @@ interface AppConfig {
 }
 
 const config: CapacitorConfig & AppConfig = {
-  appId: 'app.affine.pro',
-  appName: 'AFFiNE',
+  // MOJO branded mobile shell — points at the self-hosted MOJO Notion
+  // backend so all features deployed to the web automatically appear
+  // in the app without rebuilding.
+  appId: 'com.mojodevelopments.notion',
+  appName: 'MOJO Notion',
   webDir: 'dist',
   affineVersion: packageJson.version,
   ios: {
-    scheme: 'AFFiNE',
+    scheme: 'MOJO Notion',
     path: '.',
     webContentsDebuggingEnabled: true,
   },
   server: {
-    // url: 'http://localhost:8080',
+    url: 'https://notion.mojodevelopments.com',
+    cleartext: false,
   },
   plugins: {
+    // Bridge WKWebView's in-process cookie store with the system
+    // HTTPCookieStorage so the auth session survives WebView process
+    // restarts (iOS reclaims memory aggressively when the app is in
+    // background and the user otherwise has to sign in on every launch).
     CapacitorCookies: {
-      enabled: false,
+      enabled: true,
     },
     CapacitorHttp: {
       enabled: false,
