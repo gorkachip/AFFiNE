@@ -12,6 +12,7 @@ import { ArrowRightSmallIcon } from '@blocksuite/icons/rc';
 import { FrameworkScope, useService } from '@toeverything/infra';
 import { useCallback } from 'react';
 
+import { ClearCreatorsPanel } from './clear-creators';
 import { DeleteLeaveWorkspace } from './delete-leave-workspace';
 import { EnableCloudPanel } from './enable-cloud';
 import { LabelsPanel } from './labels';
@@ -65,6 +66,7 @@ export const WorkspaceSettingDetail = ({
       <TemplateDocSetting />
       <SharingPanel />
       <SettingWrapper>
+        <ClearCreatorsPanel />
         <DeleteLeaveWorkspace onCloseSetting={onCloseSetting} />
         <SettingRow
           name={
