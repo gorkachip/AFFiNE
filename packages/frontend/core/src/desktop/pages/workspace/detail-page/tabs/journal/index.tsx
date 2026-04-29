@@ -23,7 +23,6 @@ import {
 import { DocDisplayMetaService } from '@affine/core/modules/doc-display-meta';
 import { IntegrationService } from '@affine/core/modules/integration';
 import { JournalService } from '@affine/core/modules/journal';
-import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import {
   ViewService,
   WorkbenchLink,
@@ -312,18 +311,14 @@ export const EditorJournalPanel = () => {
 // MOJO: list of kanban-card deadlines that are still pending and reach
 // or pass the journal day being viewed. Shows on every day from "today"
 // through the deadline so it acts as a recurring reminder. Filter is the
-// same one /deadlines uses (creator OR assigned member; admins see all).
+// same one /deadlines uses (creator OR assigned member).
 const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
   const deadlineIndex = useService(DeadlineIndexService);
   const authService = useService(AuthService);
-  const permissionService = useService(WorkspacePermissionService);
   const workbench = useService(WorkbenchService).workbench;
   const all = useLiveData(deadlineIndex.deadlines$);
   const currentUserId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
-  );
-  const isOwnerOrAdmin = useLiveData(
-    permissionService.permission.isOwnerOrAdmin$
   );
 
   const todayStart = useMemo(() => {
@@ -336,21 +331,20 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
   }, [date]);
 
   const items = useMemo(() => {
+    if (!currentUserId) return [];
     const filtered = all.filter(entry => {
       if (entry.deadline < todayStart) return false;
       const deadlineDayStart = new Date(entry.deadline);
       deadlineDayStart.setHours(0, 0, 0, 0);
       if (dayStart > deadlineDayStart.getTime()) return false;
       if (dayStart < todayStart) return false;
-      if (isOwnerOrAdmin) return true;
-      if (!currentUserId) return false;
       return (
         entry.createdBy === currentUserId ||
         entry.memberIds.includes(currentUserId)
       );
     });
     return filtered.sort((a, b) => a.deadline - b.deadline);
-  }, [all, todayStart, dayStart, isOwnerOrAdmin, currentUserId]);
+  }, [all, todayStart, dayStart, currentUserId]);
 
   if (items.length === 0) return null;
 
