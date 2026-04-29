@@ -1,13 +1,12 @@
-import { ConfirmModal } from '@affine/component';
 import { SettingRow } from '@affine/component/setting-components';
-import { WorkspacePermissionService } from '@affine/core/modules/permissions';
+import { ConfirmModal } from '@affine/component/ui/modal';
 import {
   type Workspace,
   WorkspaceService,
 } from '@affine/core/modules/workspace';
 import type { DocImpl } from '@affine/core/modules/workspace/impls/doc';
 import { ArrowRightSmallIcon } from '@blocksuite/icons/rc';
-import { useLiveData, useService } from '@toeverything/infra';
+import { useService } from '@toeverything/infra';
 import { useCallback, useState } from 'react';
 
 interface CleanupSummary {
@@ -45,10 +44,6 @@ async function clearAllCreators(workspace: Workspace): Promise<CleanupSummary> {
 
 export const ClearCreatorsPanel = () => {
   const workspace = useService(WorkspaceService).workspace;
-  const permissionService = useService(WorkspacePermissionService);
-  const isOwnerOrAdmin = useLiveData(
-    permissionService.permission.isOwnerOrAdmin$
-  );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
@@ -68,8 +63,6 @@ export const ClearCreatorsPanel = () => {
       setConfirmOpen(false);
     }
   }, [workspace]);
-
-  if (!isOwnerOrAdmin) return null;
 
   return (
     <>
