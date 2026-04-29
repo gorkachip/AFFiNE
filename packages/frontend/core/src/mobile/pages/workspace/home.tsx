@@ -7,7 +7,7 @@ import {
   NavigationPanelOrganize,
   NavigationPanelTags,
 } from '../../components/navigation';
-import { HomeHeader, RecentDocs } from '../../views';
+import { DeadlinesShortcut, HomeHeader, RecentDocs } from '../../views';
 
 export const Component = () => {
   useThemeColorV2('layer/background/mobile/primary');
@@ -15,6 +15,7 @@ export const Component = () => {
   return (
     <>
       <HomeHeader />
+      <DeadlinesShortcut />
       <RecentDocs />
       <SafeArea bottom>
         <div

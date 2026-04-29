@@ -52,6 +52,10 @@ export const workbenchRoutes = [
     lazy: () => import('./pages/workspace/trash'),
   },
   {
+    path: '/deadlines',
+    lazy: () => import('./pages/workspace/deadlines'),
+  },
+  {
     path: '/:pageId',
     lazy: () => import('./pages/workspace/detail/mobile-detail-page'),
   },
