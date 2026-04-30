@@ -133,6 +133,12 @@ export const AFFiNE_WORKSPACE_USERDATA_DB_SCHEMA = {
   favorite: {
     key: f.string().primaryKey(),
     index: f.string(),
+    // MOJO: stamp every favourite write with the user that produced
+    // it so the FavoriteStore can second-line filter on read. Even if
+    // the underlying userdata bucket ever leaks across users (legacy
+    // __local__ rows, sync edge cases) the UI will still only show
+    // the current user's favourites.
+    ownerId: f.string().optional(),
   },
   settings: {
     key: f.string().primaryKey(),

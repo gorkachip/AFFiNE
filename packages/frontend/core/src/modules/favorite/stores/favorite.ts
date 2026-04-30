@@ -1,6 +1,7 @@
 import { LiveData, Store } from '@toeverything/infra';
 import { map } from 'rxjs';
 
+import type { AuthService } from '../../cloud';
 import type { WorkspaceDBService } from '../../db';
 import type { FavoriteSupportTypeUnion } from '../constant';
 import { isFavoriteSupportType } from '../constant';
@@ -11,9 +12,27 @@ export interface FavoriteRecord {
   index: string;
 }
 
+interface RawFavoriteRow {
+  key: string;
+  index: string;
+  ownerId?: string | null;
+}
+
 export class FavoriteStore extends Store {
-  constructor(private readonly workspaceDBService: WorkspaceDBService) {
+  constructor(
+    private readonly workspaceDBService: WorkspaceDBService,
+    private readonly authService?: AuthService
+  ) {
     super();
+  }
+
+  // MOJO: ownerId stamped on every favourite write so the read path
+  // can second-line filter even if the underlying userdata bucket
+  // ever leaks across users (legacy __local__ rows, sync edge cases).
+  // Records without ownerId are treated as orphaned legacy data and
+  // hidden from everyone — users who care will simply re-favourite.
+  private get currentUserId(): string | null {
+    return this.authService?.session.account$.value?.id ?? null;
   }
 
   watchIsLoading() {
@@ -27,7 +46,11 @@ export class FavoriteStore extends Store {
       .map(db => LiveData.from(db.favorite.find$(), []))
       .flat()
       .map(raw => {
+        const userId = this.currentUserId;
         return raw
+          .filter(
+            (row: RawFavoriteRow) => row.ownerId && row.ownerId === userId
+          )
           .map(data => this.toRecord(data))
           .filter((record): record is FavoriteRecord => !!record);
       });
@@ -42,6 +65,7 @@ export class FavoriteStore extends Store {
     const raw = db.favorite.create({
       key: this.encodeKey(type, id),
       index,
+      ownerId: this.currentUserId ?? undefined,
     });
     return this.toRecord(raw) as FavoriteRecord;
   }
@@ -59,17 +83,21 @@ export class FavoriteStore extends Store {
   watchFavorite(type: FavoriteSupportTypeUnion, id: string) {
     const db = this.workspaceDBService.userdataDB$.value;
     return LiveData.from<FavoriteRecord | undefined>(
-      db.favorite
-        .get$(this.encodeKey(type, id))
-        .pipe(map(data => (data ? this.toRecord(data) : undefined))),
+      db.favorite.get$(this.encodeKey(type, id)).pipe(
+        map(data => {
+          if (!data) return undefined;
+          const row = data as RawFavoriteRow;
+          if (!row.ownerId || row.ownerId !== this.currentUserId) {
+            return undefined;
+          }
+          return this.toRecord(row);
+        })
+      ),
       null as any
     );
   }
 
-  private toRecord(data: {
-    key: string;
-    index: string;
-  }): FavoriteRecord | undefined {
+  private toRecord(data: RawFavoriteRow): FavoriteRecord | undefined {
     const key = this.parseKey(data.key);
     if (!key) {
       return undefined;
