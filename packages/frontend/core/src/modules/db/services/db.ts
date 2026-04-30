@@ -110,24 +110,45 @@ export class WorkspaceDBService extends Service {
   // observed by another user.
   private readonly pendingUserdataKey = `__pending__$${this.workspaceService.workspace.id}$${Math.random().toString(36).slice(2)}`;
 
-  public get userdataDB$() {
-    // True local-only workspaces (no server) keep using the shared
-    // __local__ doc — there's only one logical user there.
-    if (
-      this.workspaceService.workspace.meta.flavour === 'local' ||
-      !this.authService
-    ) {
-      return new LiveData(this.userdataDB('__local__'));
+  // MOJO: cache the LiveData so consumers always observe (and read .value
+  // from) the same instance. Returning a fresh .map() on every access
+  // meant the first .value read landed before the upstream had a chance
+  // to populate it, which manifested as favourites being written without
+  // an owner stamp and disappearing from the writer's own sidebar.
+  private _cachedUserdataDB$: LiveData<
+    WorkspaceDBWithTables<AFFiNEWorkspaceUserdataDbSchema>
+  > | null = null;
+
+  public get userdataDB$(): LiveData<
+    WorkspaceDBWithTables<AFFiNEWorkspaceUserdataDbSchema>
+  > {
+    if (this._cachedUserdataDB$) {
+      return this._cachedUserdataDB$;
     }
-    return this.authService.session.account$.map(account => {
+    // True local-only workspaces (no server) are the only ones that
+    // legitimately share __local__ — there's only one user there.
+    if (this.workspaceService.workspace.meta.flavour === 'local') {
+      this._cachedUserdataDB$ = new LiveData(this.userdataDB('__local__'));
+      return this._cachedUserdataDB$;
+    }
+    // Cloud / selfhost: never fall back to the shared __local__ bucket,
+    // even if the auth service hasn't materialised yet. Drop into the
+    // per-tab pending bucket while we wait for either authService or an
+    // authenticated account, then switch to the user-keyed userdata
+    // doc once we have one.
+    if (!this.authService) {
+      this._cachedUserdataDB$ = new LiveData(
+        this.userdataDB(this.pendingUserdataKey)
+      );
+      return this._cachedUserdataDB$;
+    }
+    this._cachedUserdataDB$ = this.authService.session.account$.map(account => {
       if (account) {
         return this.userdataDB(account.id);
       }
-      // Cloud workspace but auth still loading: use an isolated pending
-      // bucket scoped to this tab so we never write to (or read from)
-      // another user's data while we wait.
       return this.userdataDB(this.pendingUserdataKey);
     });
+    return this._cachedUserdataDB$;
   }
 
   static isDBDocId(docId: string) {
