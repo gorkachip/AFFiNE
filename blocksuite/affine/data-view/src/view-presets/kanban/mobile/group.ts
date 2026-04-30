@@ -69,8 +69,52 @@ export class MobileKanbanGroup extends SignalWatcher(
     this.requestUpdate();
   };
 
+  // MOJO: see kanban/pc/group.ts for the rationale — same gate, just
+  // wired into the mobile menu shape.
+  private get _mojoIsOwnerOrAdmin(): boolean {
+    const auth = (
+      globalThis as unknown as {
+        __mojoAuthContext?: { userId: string | null; isOwnerOrAdmin: boolean };
+      }
+    ).__mojoAuthContext;
+    return auth?.isOwnerOrAdmin ?? true;
+  }
+
+  private get _mojoSiblingGroups(): Array<{ key: string; name: string }> {
+    const groupMap = this.group.manager.groupDataMap$.value ?? {};
+    return Object.values(groupMap)
+      .filter(g => g.key !== this.group.key && g.value != null)
+      .map(g => ({ key: g.key, name: g.name$.value || 'Untitled' }));
+  }
+
+  private _mojoRemoveOption(propertyId: string) {
+    const prop = this.view.propertyGetOrCreate(propertyId);
+    if (!prop) return;
+    prop.dataUpdate(prev => {
+      if (
+        prev &&
+        typeof prev === 'object' &&
+        'options' in prev &&
+        Array.isArray((prev as { options?: unknown[] }).options)
+      ) {
+        const data = prev as { options: Array<{ id: string }> };
+        return {
+          ...data,
+          options: data.options.filter(o => o.id !== this.group.key),
+        };
+      }
+      return prev;
+    });
+  }
+
   private readonly clickGroupOptions = (e: MouseEvent) => {
     const ele = e.currentTarget as HTMLElement;
+    const siblings = this._mojoSiblingGroups;
+    const isAdmin = this._mojoIsOwnerOrAdmin;
+    const cardCount = this.group.rows.length;
+    const hasGroupValue = this.group.value != null;
+    const propertyId = () => this.group.manager.property$.value?.id;
+
     popFilterableSimpleMenu(popupTargetFromElement(ele), [
       menu.group({
         items: [
@@ -89,6 +133,55 @@ export class MobileKanbanGroup extends SignalWatcher(
             select: () => {
               this.view.rowsDelete(this.group.rows.map(row => row.rowId));
               this.requestUpdate();
+            },
+          }),
+          menu.subMenu({
+            name: 'Delete status',
+            hide: () => !hasGroupValue || !isAdmin,
+            options: {
+              items: [
+                ...siblings.map(sibling =>
+                  menu.action({
+                    name:
+                      cardCount === 0
+                        ? 'Delete (no cards)'
+                        : `Move ${cardCount} card${cardCount === 1 ? '' : 's'} to "${sibling.name}"`,
+                    hide: () =>
+                      cardCount === 0 && siblings.indexOf(sibling) > 0,
+                    select: () => {
+                      const pid = propertyId();
+                      if (!pid) return;
+                      this.group.rows.forEach(row => {
+                        this.group.manager.moveCardTo(
+                          row.rowId,
+                          this.group.key,
+                          sibling.key,
+                          'end'
+                        );
+                      });
+                      this._mojoRemoveOption(pid);
+                      this.requestUpdate();
+                    },
+                  })
+                ),
+                menu.action({
+                  name:
+                    cardCount === 0
+                      ? 'Delete empty status'
+                      : `Trash ${cardCount} card${cardCount === 1 ? '' : 's'} and delete`,
+                  class: { 'delete-item': true },
+                  select: () => {
+                    const pid = propertyId();
+                    if (cardCount > 0) {
+                      this.view.rowsDelete(
+                        this.group.rows.map(row => row.rowId)
+                      );
+                    }
+                    if (pid) this._mojoRemoveOption(pid);
+                    this.requestUpdate();
+                  },
+                }),
+              ],
             },
           }),
         ],

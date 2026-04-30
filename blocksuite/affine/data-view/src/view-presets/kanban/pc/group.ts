@@ -131,8 +131,77 @@ export class KanbanGroup extends SignalWatcher(
     this.requestUpdate();
   };
 
+  // MOJO: read by Delete status to enforce admin/owner-only on
+  // permanently removing a kanban column. Falls back to allowing the
+  // action when running outside the AFFiNE shell (tests, etc).
+  private get _mojoIsOwnerOrAdmin(): boolean {
+    const auth = (
+      globalThis as unknown as {
+        __mojoAuthContext?: { userId: string | null; isOwnerOrAdmin: boolean };
+      }
+    ).__mojoAuthContext;
+    return auth?.isOwnerOrAdmin ?? true;
+  }
+
+  // MOJO: pluck the underlying property's option list so we can offer
+  // "Move cards to ..." targets and rewrite the property data after
+  // delete. Works for select / multi-select kanban groupings; other
+  // group types fall back to undefined and the move targets disappear.
+  private get _mojoSiblingGroups(): Array<{ key: string; name: string }> {
+    const groupMap = this.group.manager.groupDataMap$.value ?? {};
+    return Object.values(groupMap)
+      .filter(g => g.key !== this.group.key && g.value != null)
+      .map(g => ({ key: g.key, name: g.name$.value || 'Untitled' }));
+  }
+
+  private readonly _mojoMoveAllTo = (targetKey: string) => {
+    const propertyId = this.group.manager.property$.value?.id;
+    if (!propertyId) return;
+    const rowIds = this.group.rows.map(r => r.rowId);
+    rowIds.forEach(rowId => {
+      this.group.manager.moveCardTo(rowId, this.group.key, targetKey, 'end');
+    });
+    this._mojoRemoveOption(propertyId);
+    this.requestUpdate();
+  };
+
+  private readonly _mojoTrashAll = () => {
+    const propertyId = this.group.manager.property$.value?.id;
+    this.view.rowsDelete(this.group.rows.map(row => row.rowId));
+    if (propertyId) this._mojoRemoveOption(propertyId);
+    this.requestUpdate();
+  };
+
+  // MOJO: strip the option from the property's data so the column
+  // doesn't reappear empty after the delete. Only mutates select-style
+  // option arrays — leaves other property shapes untouched.
+  private _mojoRemoveOption(propertyId: string) {
+    const prop = this.view.propertyGetOrCreate(propertyId);
+    if (!prop) return;
+    prop.dataUpdate(prev => {
+      if (
+        prev &&
+        typeof prev === 'object' &&
+        'options' in prev &&
+        Array.isArray((prev as { options?: unknown[] }).options)
+      ) {
+        const data = prev as { options: Array<{ id: string }> };
+        return {
+          ...data,
+          options: data.options.filter(o => o.id !== this.group.key),
+        };
+      }
+      return prev;
+    });
+  }
+
   private readonly clickGroupOptions = (e: MouseEvent) => {
     const ele = e.currentTarget as HTMLElement;
+    const siblings = this._mojoSiblingGroups;
+    const isAdmin = this._mojoIsOwnerOrAdmin;
+    const cardCount = this.group.rows.length;
+    const hasGroupValue = this.group.value != null;
+
     popFilterableSimpleMenu(popupTargetFromElement(ele), [
       menu.action({
         name: 'Ungroup',
@@ -149,6 +218,47 @@ export class KanbanGroup extends SignalWatcher(
         select: () => {
           this.view.rowsDelete(this.group.rows.map(row => row.rowId));
           this.requestUpdate();
+        },
+      }),
+      // MOJO: delete the status itself (the kanban column). Only
+      // enabled for owners/admins. Cards have to go somewhere, so the
+      // submenu forces a choice between "Move to <other status>" or
+      // "Trash all". Hidden when there's no real group value (the
+      // "Ungrouped" pseudo-column) since you can't delete that.
+      menu.subMenu({
+        name: 'Delete status',
+        hide: () => !hasGroupValue || !isAdmin,
+        options: {
+          items: [
+            ...siblings.map(sibling =>
+              menu.action({
+                name:
+                  cardCount === 0
+                    ? `Delete (no cards)`
+                    : `Move ${cardCount} card${cardCount === 1 ? '' : 's'} to "${sibling.name}"`,
+                hide: () => cardCount === 0 && siblings.indexOf(sibling) > 0,
+                select: () => {
+                  this._mojoMoveAllTo(sibling.key);
+                },
+              })
+            ),
+            menu.action({
+              name:
+                cardCount === 0
+                  ? 'Delete empty status'
+                  : `Trash ${cardCount} card${cardCount === 1 ? '' : 's'} and delete`,
+              class: { 'delete-item': true },
+              select: () => {
+                if (cardCount === 0) {
+                  const propertyId = this.group.manager.property$.value?.id;
+                  if (propertyId) this._mojoRemoveOption(propertyId);
+                  this.requestUpdate();
+                  return;
+                }
+                this._mojoTrashAll();
+              },
+            }),
+          ],
         },
       }),
     ]);
