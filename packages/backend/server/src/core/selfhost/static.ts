@@ -108,11 +108,13 @@ export class StaticFilesResolver implements OnModuleInit {
 
     // fallback all unknown routes
     app.get([basePath, basePath + '/*path'], this.check.use, (req, res) => {
-      const mobile =
-        env.namespaces.canary &&
-        isMobile({
-          ua: req.headers['user-agent'] ?? undefined,
-        });
+      // Drop the env.namespaces.canary gate so selfhost production
+      // deployments serve the mobile bundle to mobile UAs. Without
+      // this, every mobile device falls back to the desktop bundle
+      // which renders unusably small on phones.
+      const mobile = isMobile({
+        ua: req.headers['user-agent'] ?? undefined,
+      });
 
       return res.sendFile(
         join(
