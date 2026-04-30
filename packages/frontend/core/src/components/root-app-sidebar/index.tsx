@@ -32,7 +32,6 @@ import {
   CollapsibleSection,
   NavigationPanelCollections,
   NavigationPanelFavorites,
-  NavigationPanelMigrationFavorites,
   NavigationPanelOrganize,
   NavigationPanelTags,
 } from '../../desktop/components/navigation-panel';
@@ -235,7 +234,12 @@ export const RootAppSidebar = memo((): ReactElement => {
       <SidebarScrollableContainer>
         <NavigationPanelFavorites />
         <NavigationPanelOrganize />
-        <NavigationPanelMigrationFavorites />
+        {/* MOJO: NavigationPanelMigrationFavorites read from
+            affine:workspace-properties (workspace-shared), so any
+            "legacy" favourite saved by one member showed up in every
+            other member's sidebar. We never relied on the migration
+            UI, so just drop the section instead of trying to scope a
+            shared map per-user. */}
         <NavigationPanelTags />
         <NavigationPanelCollections />
         <CollapsibleSection
