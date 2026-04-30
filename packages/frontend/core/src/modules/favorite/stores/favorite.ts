@@ -49,9 +49,19 @@ export class FavoriteStore extends Store {
       .map(raw => {
         const userId = this.currentUserId;
         return raw
-          .filter(
-            (row: RawFavoriteRow) => row.ownerId && row.ownerId === userId
-          )
+          .filter((row: RawFavoriteRow) => {
+            // Reject rows that were stamped with a different user — that's
+            // the leak path we're plugging.
+            if (row.ownerId && userId && row.ownerId !== userId) {
+              return false;
+            }
+            // Rows without ownerId (legacy + writes that landed before
+            // account$ resolved) stay visible. They live in the per-user
+            // userdata bucket so cross-user contamination is already
+            // bounded by the bucket, and hiding them would silently lose
+            // every favourite the user added during a sluggish auth load.
+            return true;
+          })
           .map(data => this.toRecord(data))
           .filter((record): record is FavoriteRecord => !!record);
       });
@@ -88,7 +98,8 @@ export class FavoriteStore extends Store {
         map(data => {
           if (!data) return undefined;
           const row = data as RawFavoriteRow;
-          if (!row.ownerId || row.ownerId !== this.currentUserId) {
+          const userId = this.currentUserId;
+          if (row.ownerId && userId && row.ownerId !== userId) {
             return undefined;
           }
           return this.toRecord(row);
