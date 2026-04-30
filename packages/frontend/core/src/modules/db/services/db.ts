@@ -100,22 +100,34 @@ export class WorkspaceDBService extends Service {
   }
 
   authService = this.workspaceServerService.server?.scope.get(AuthService);
+
+  // MOJO: per-tab key used while the auth session is still resolving on a
+  // cloud-flavoured workspace. Without this, the original implementation
+  // fell back to a workspace-shared `__local__` userdata doc and any
+  // favourite/sidebar item one user wrote during that window leaked to
+  // every other workspace member. Generating a fresh key per tab makes
+  // the pending bucket isolated to this session, so it can never be
+  // observed by another user.
+  private readonly pendingUserdataKey = `__pending__$${this.workspaceService.workspace.id}$${Math.random().toString(36).slice(2)}`;
+
   public get userdataDB$() {
-    // if is local workspace or no account, use __local__ userdata
-    // sometimes we may have cloud workspace but no account for a short time, we also use __local__ userdata
+    // True local-only workspaces (no server) keep using the shared
+    // __local__ doc — there's only one logical user there.
     if (
       this.workspaceService.workspace.meta.flavour === 'local' ||
       !this.authService
     ) {
       return new LiveData(this.userdataDB('__local__'));
-    } else {
-      return this.authService.session.account$.map(account => {
-        if (!account) {
-          return this.userdataDB('__local__');
-        }
-        return this.userdataDB(account.id);
-      });
     }
+    return this.authService.session.account$.map(account => {
+      if (account) {
+        return this.userdataDB(account.id);
+      }
+      // Cloud workspace but auth still loading: use an isolated pending
+      // bucket scoped to this tab so we never write to (or read from)
+      // another user's data while we wait.
+      return this.userdataDB(this.pendingUserdataKey);
+    });
   }
 
   static isDBDocId(docId: string) {
