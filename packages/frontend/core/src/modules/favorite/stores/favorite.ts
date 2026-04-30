@@ -1,7 +1,6 @@
 import { LiveData, Store } from '@toeverything/infra';
 import { map } from 'rxjs';
 
-import type { AuthService } from '../../cloud';
 import type { WorkspaceDBService } from '../../db';
 import type { FavoriteSupportTypeUnion } from '../constant';
 import { isFavoriteSupportType } from '../constant';
@@ -19,10 +18,7 @@ interface RawFavoriteRow {
 }
 
 export class FavoriteStore extends Store {
-  constructor(
-    private readonly workspaceDBService: WorkspaceDBService,
-    private readonly authService?: AuthService
-  ) {
+  constructor(private readonly workspaceDBService: WorkspaceDBService) {
     super();
   }
 
@@ -31,8 +27,13 @@ export class FavoriteStore extends Store {
   // ever leaks across users (legacy __local__ rows, sync edge cases).
   // Records without ownerId are treated as orphaned legacy data and
   // hidden from everyone — users who care will simply re-favourite.
+  // We piggyback on WorkspaceDBService.authService instead of injecting
+  // AuthService directly because AuthService lives in the per-server
+  // scope, not the workspace scope FavoriteStore is created in.
   private get currentUserId(): string | null {
-    return this.authService?.session.account$.value?.id ?? null;
+    return (
+      this.workspaceDBService.authService?.session.account$.value?.id ?? null
+    );
   }
 
   watchIsLoading() {
