@@ -5,9 +5,12 @@ import {
   DocExplorerContext,
 } from '@affine/core/components/explorer/context';
 import { DocsExplorer } from '@affine/core/components/explorer/docs-view/docs-list';
+import { AuthService } from '@affine/core/modules/cloud';
 import { CollectionRulesService } from '@affine/core/modules/collection-rules';
+import type { FilterParams } from '@affine/core/modules/collection-rules/types';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { useLiveData, useService } from '@toeverything/infra';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Page } from '../../components/page';
 import { AllDocsHeader } from '../../views';
@@ -29,6 +32,48 @@ const AllDocs = () => {
     })
   );
   const collectionRulesService = useService(CollectionRulesService);
+  // MOJO: same scoping as the desktop All Docs page — admin/owner sees
+  // every doc, members only see what they created.
+  const authService = useService(AuthService);
+  const permissionService = useService(WorkspacePermissionService);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+  const isOwnerOrAdmin = useLiveData(
+    permissionService.permission.isOwnerOrAdmin$
+  );
+  const visibilityExtraFilters = useMemo<FilterParams[]>(() => {
+    const base: FilterParams[] = [
+      { type: 'system', key: 'trash', method: 'is', value: 'false' },
+      {
+        type: 'system',
+        key: 'empty-journal',
+        method: 'is',
+        value: 'false',
+      },
+    ];
+    if (isOwnerOrAdmin) return base;
+    if (!currentUserId) {
+      return [
+        ...base,
+        {
+          type: 'system',
+          key: 'createdBy',
+          method: 'include',
+          value: '__no_user__',
+        },
+      ];
+    }
+    return [
+      ...base,
+      {
+        type: 'system',
+        key: 'createdBy',
+        method: 'include',
+        value: currentUserId,
+      },
+    ];
+  }, [currentUserId, isOwnerOrAdmin]);
   const groups = useLiveData(explorerContextValue.groups$);
   const isEmpty =
     groups.length === 0 ||
@@ -40,15 +85,7 @@ const AllDocs = () => {
         filters: [
           { type: 'system', key: 'trash', method: 'is', value: 'false' },
         ],
-        extraFilters: [
-          { type: 'system', key: 'trash', method: 'is', value: 'false' },
-          {
-            type: 'system',
-            key: 'empty-journal',
-            method: 'is',
-            value: 'false',
-          },
-        ],
+        extraFilters: visibilityExtraFilters,
         orderBy: {
           type: 'system',
           key: 'updatedAt',
@@ -62,7 +99,11 @@ const AllDocs = () => {
         error: console.error,
       });
     return () => subscription.unsubscribe();
-  }, [collectionRulesService, explorerContextValue.groups$]);
+  }, [
+    collectionRulesService,
+    explorerContextValue.groups$,
+    visibilityExtraFilters,
+  ]);
 
   if (isEmpty) {
     return (

@@ -6,16 +6,18 @@ import {
 import { DocsExplorer } from '@affine/core/components/explorer/docs-view/docs-list';
 import type { ExplorerDisplayPreference } from '@affine/core/components/explorer/types';
 import { Filters } from '@affine/core/components/filter';
+import { AuthService } from '@affine/core/modules/cloud';
 import {
   CollectionService,
   PinnedCollectionService,
 } from '@affine/core/modules/collection';
 import { CollectionRulesService } from '@affine/core/modules/collection-rules';
 import type { FilterParams } from '@affine/core/modules/collection-rules/types';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkspaceLocalState } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   ViewBody,
@@ -180,6 +182,60 @@ export const AllPage = () => {
 
   const { openPromptModal } = usePromptModal();
 
+  // MOJO: only show docs the current user actually has visibility to.
+  // By default AFFiNE leaks every workspace doc to every member; we
+  // restrict the All Docs view to docs the user created. Owners and
+  // admins keep the unrestricted view.
+  const authService = useService(AuthService);
+  const permissionService = useService(WorkspacePermissionService);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+  const isOwnerOrAdmin = useLiveData(
+    permissionService.permission.isOwnerOrAdmin$
+  );
+
+  const visibilityExtraFilters = useMemo<FilterParams[]>(() => {
+    const base: FilterParams[] = [
+      {
+        type: 'system',
+        key: 'empty-journal',
+        method: 'is',
+        value: 'false',
+      },
+      {
+        type: 'system',
+        key: 'trash',
+        method: 'is',
+        value: 'false',
+      },
+    ];
+    if (isOwnerOrAdmin) return base;
+    if (!currentUserId) {
+      // No identified user: return a filter that matches no docs so we
+      // never accidentally serve the workspace-wide list while waiting
+      // for auth state.
+      return [
+        ...base,
+        {
+          type: 'system',
+          key: 'createdBy',
+          method: 'include',
+          value: '__no_user__',
+        },
+      ];
+    }
+    return [
+      ...base,
+      {
+        type: 'system',
+        key: 'createdBy',
+        method: 'include',
+        value: currentUserId,
+      },
+    ];
+  }, [currentUserId, isOwnerOrAdmin]);
+
   const collectionRulesService = useService(CollectionRulesService);
   useEffect(() => {
     const subscription = collectionRulesService
@@ -190,20 +246,7 @@ export const AllPage = () => {
               groupBy,
               orderBy,
               extraAllowList: selectedCollectionInfo.allowList,
-              extraFilters: [
-                {
-                  type: 'system',
-                  key: 'empty-journal',
-                  method: 'is',
-                  value: 'false',
-                },
-                {
-                  type: 'system',
-                  key: 'trash',
-                  method: 'is',
-                  value: 'false',
-                },
-              ],
+              extraFilters: visibilityExtraFilters,
             }
           : {
               filters:
@@ -220,20 +263,7 @@ export const AllPage = () => {
                     ],
               groupBy,
               orderBy,
-              extraFilters: [
-                {
-                  type: 'system',
-                  key: 'empty-journal',
-                  method: 'is',
-                  value: 'false',
-                },
-                {
-                  type: 'system',
-                  key: 'trash',
-                  method: 'is',
-                  value: 'false',
-                },
-              ],
+              extraFilters: visibilityExtraFilters,
             }
       )
       .subscribe({
@@ -255,6 +285,7 @@ export const AllPage = () => {
     selectedCollection,
     selectedCollectionInfo,
     tempFilters,
+    visibilityExtraFilters,
   ]);
 
   useEffect(() => {
