@@ -502,8 +502,27 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     }
     const block = this.doc.getBlock(rowId);
     const model = block?.model as
-      | { text?: { toString(): string }; props?: { 'meta:createdBy'?: string } }
+      | {
+          text?: { toString(): string };
+          props?: {
+            'meta:createdBy'?: string;
+            'meta:trashed'?: boolean;
+          };
+        }
       | undefined;
+    // MOJO: a row can carry a deadline AND be in the per-kanban soft-trash
+    // bin. Don't surface trashed rows in the workspace deadline index;
+    // they'd show as ghost entries in /deadlines and the journal block.
+    if (model?.props?.['meta:trashed']) {
+      bridge.remove(docId, rowId);
+      return;
+    }
+    if (!block) {
+      // Row block has been hard-deleted — drop the orphan entry so it
+      // stops appearing in the deadlines list and journal calendar.
+      bridge.remove(docId, rowId);
+      return;
+    }
     const title = model?.text?.toString().trim() || '';
     const createdBy = model?.props?.['meta:createdBy'];
     bridge.upsert({ docId, rowId, deadline, createdBy, memberIds, title });
