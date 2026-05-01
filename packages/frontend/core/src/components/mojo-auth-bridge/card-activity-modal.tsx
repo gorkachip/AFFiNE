@@ -68,11 +68,22 @@ export const CardActivityModal = ({
         <ul className={styles.list}>
           {entries.map(entry => {
             const newValue = entry.details?.['newValue'];
+            const oldValue = entry.details?.['oldValue'];
             // Display order: "<actor name> <action> · <time>". Older
             // entries written before the actorName stamp landed will
             // have actorName=undefined; show "Someone" as a placeholder
             // rather than rendering a blank prefix.
             const actor = entry.actorName?.trim() || 'Someone';
+            const hasOld =
+              oldValue !== undefined &&
+              oldValue !== null &&
+              oldValue !== '' &&
+              !(Array.isArray(oldValue) && oldValue.length === 0);
+            const hasNew =
+              newValue !== undefined &&
+              newValue !== null &&
+              newValue !== '' &&
+              !(Array.isArray(newValue) && newValue.length === 0);
             return (
               <li key={entry.id} className={styles.item}>
                 <div className={styles.head}>
@@ -83,8 +94,14 @@ export const CardActivityModal = ({
                     {formatRelative(entry.timestamp, nowSnapshot)}
                   </span>
                 </div>
-                {newValue !== undefined && (
-                  <div className={styles.body}>→ {describeValue(newValue)}</div>
+                {(hasOld || hasNew) && (
+                  <div className={styles.body}>
+                    {hasOld && hasNew
+                      ? `${describeValue(oldValue)} → ${describeValue(newValue)}`
+                      : hasNew
+                        ? `Set to ${describeValue(newValue)}`
+                        : `Cleared (was ${describeValue(oldValue)})`}
+                  </div>
                 )}
               </li>
             );

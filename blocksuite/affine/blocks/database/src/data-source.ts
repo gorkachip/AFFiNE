@@ -389,7 +389,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     // moves, etc). Skip our own internal MOJO Activity Log property to
     // avoid recursion noise.
     if (type !== 'activity-log') {
-      this._logCardActivity(rowId, propertyId, type, value);
+      this._logCardActivity(rowId, propertyId, type, value, old);
     }
   }
 
@@ -397,7 +397,8 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     rowId: string,
     propertyId: string,
     columnType: string,
-    newValue: unknown
+    newValue: unknown,
+    oldValue?: unknown
   ): void {
     const bridge = (
       globalThis as unknown as {
@@ -419,6 +420,26 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       c => c.id === propertyId
     );
     const columnName = column?.name ?? columnType;
+    // MOJO: resolve raw IDs to human-readable labels for select/tag
+    // columns so the modal doesn't end up rendering option UUIDs.
+    const labelValue = (val: unknown): unknown => {
+      if (val == null) return val;
+      const data = column?.data as
+        | { options?: Array<{ id: string; value?: string }> }
+        | undefined;
+      const opts = data?.options;
+      if (!opts) return val;
+      if (typeof val === 'string') {
+        const opt = opts.find(o => o.id === val);
+        return opt?.value ?? val;
+      }
+      if (Array.isArray(val)) {
+        return val.map(v =>
+          typeof v === 'string' ? (opts.find(o => o.id === v)?.value ?? v) : v
+        );
+      }
+      return val;
+    };
     bridge.add({
       rowId,
       docId: this._model.store.id,
@@ -431,7 +452,8 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       details: {
         columnType,
         columnName,
-        newValue,
+        newValue: labelValue(newValue),
+        oldValue: labelValue(oldValue),
       },
     });
   }

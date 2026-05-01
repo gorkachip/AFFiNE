@@ -27,6 +27,14 @@ const styles = css`
     transition: background-color 100ms ease-in-out;
     background-color: #ffffff;
     overflow: hidden;
+    /* MOJO: signal that the whole card is grabbable. Cells inside
+       still get text-cursor when editing because the editor sets
+       cursor inline. */
+    cursor: grab;
+    user-select: none;
+  }
+  affine-data-view-kanban-card:active {
+    cursor: grabbing;
   }
 
   affine-data-view-kanban-card:hover {
@@ -295,6 +303,56 @@ export class KanbanCard extends SignalWatcher(
     }
     this._disposables.addFromEvent(this, 'contextmenu', e => {
       this.contextMenu(e);
+    });
+    // MOJO: pointerdown listener on the whole card with a small movement
+    // threshold so a drag can be initiated from anywhere on the card —
+    // not only from the slim gap between cells, which is the original
+    // behaviour. We still bail out if the click started inside an
+    // actively-editing cell or on the card's action buttons (so typing
+    // and clicking the menu still work).
+    this._disposables.addFromEvent(this, 'pointerdown', e => {
+      if (this.view.readonly$.value) return;
+      if (e.button !== 0) return;
+      const target = e.target as Element | null;
+      const cell = target?.closest('affine-data-view-kanban-cell') as {
+        isEditing$?: { value: boolean };
+      } | null;
+      if (cell?.isEditing$?.value) return;
+      if (target?.closest('.card-ops')) return;
+      // Don't hijack pointerdowns on form controls inside the card
+      if (
+        target &&
+        ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(
+          (target as HTMLElement).tagName
+        )
+      ) {
+        return;
+      }
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const threshold = 4;
+      let started = false;
+      let lastEvt: PointerEvent = e;
+
+      const onMove = (mv: PointerEvent) => {
+        lastEvt = mv;
+        if (started) return;
+        const dx = Math.abs(mv.clientX - startX);
+        const dy = Math.abs(mv.clientY - startY);
+        if (dx > threshold || dy > threshold) {
+          started = true;
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          this.kanbanViewLogic.dragController?.dragStart(this, lastEvt);
+        }
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
     });
     this._disposables.addFromEvent(this, 'click', e => {
       if (e.shiftKey) {
