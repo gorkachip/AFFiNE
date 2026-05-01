@@ -297,6 +297,22 @@ export class DocsService extends Service {
     });
     targetDoc.updateProperties(properties);
 
+    // MOJO: nest the duplicate under the original by appending a
+    // LinkedPage reference to the source. Caveat: if the user later
+    // moves the duplicate via the sidebar, AFFiNE keeps the link in
+    // the source so the duplicate appears in both places — to remove
+    // the nested copy, open the source doc and delete the link line
+    // at the bottom.
+    try {
+      await this.addLinkedDoc(sourceDocId, targetDocId);
+    } catch (e) {
+      logger.warn('Failed to nest duplicate under source', {
+        sourceDocId,
+        targetDocId,
+        error: e,
+      });
+    }
+
     return targetDocId;
   }
 
