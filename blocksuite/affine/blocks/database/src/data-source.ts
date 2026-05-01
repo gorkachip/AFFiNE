@@ -63,6 +63,7 @@ type SpacialProperty = {
 // running outside the AFFiNE shell during tests).
 type MojoAuthContext = {
   userId: string | null;
+  userName?: string | null;
   isOwnerOrAdmin: boolean;
 };
 function getMojoAuth(): MojoAuthContext | undefined {
@@ -422,6 +423,10 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       rowId,
       docId: this._model.store.id,
       actorId: auth?.userId ?? undefined,
+      // MOJO: stamp the actor's display name on the activity entry so
+      // the modal doesn't have to resolve it later (and won't render
+      // blank if the user has since left the workspace).
+      actorName: auth?.userName ?? undefined,
       action: `Changed ${columnName}`,
       details: {
         columnType,

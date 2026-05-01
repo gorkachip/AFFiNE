@@ -19,6 +19,9 @@ export const MojoAuthBridge = () => {
   const userId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
   );
+  const userName = useLiveData(
+    authService.session.account$.map(a => a?.label ?? null)
+  );
   const isOwnerOrAdmin = useLiveData(
     permissionService.permission.isOwnerOrAdmin$
   );
@@ -26,6 +29,7 @@ export const MojoAuthBridge = () => {
   useEffect(() => {
     (globalThis as any).__mojoAuthContext = {
       userId,
+      userName,
       isOwnerOrAdmin: !!isOwnerOrAdmin,
     };
     return () => {
@@ -33,7 +37,7 @@ export const MojoAuthBridge = () => {
       // don't authorise actions in a subsequent one.
       delete (globalThis as any).__mojoAuthContext;
     };
-  }, [userId, isOwnerOrAdmin]);
+  }, [userId, userName, isOwnerOrAdmin]);
 
   // Surface gate-blocked actions (silent framework deletes, kanban
   // row/column/view delete throws, etc.) as a user-visible toast. The

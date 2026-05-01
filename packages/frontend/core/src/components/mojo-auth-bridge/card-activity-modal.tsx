@@ -68,10 +68,17 @@ export const CardActivityModal = ({
         <ul className={styles.list}>
           {entries.map(entry => {
             const newValue = entry.details?.['newValue'];
+            // Display order: "<actor name> <action> · <time>". Older
+            // entries written before the actorName stamp landed will
+            // have actorName=undefined; show "Someone" as a placeholder
+            // rather than rendering a blank prefix.
+            const actor = entry.actorName?.trim() || 'Someone';
             return (
               <li key={entry.id} className={styles.item}>
                 <div className={styles.head}>
-                  <span className={styles.action}>{entry.action}</span>
+                  <span className={styles.action}>
+                    <strong>{actor}</strong> {entry.action}
+                  </span>
                   <span className={styles.time}>
                     {formatRelative(entry.timestamp, nowSnapshot)}
                   </span>
