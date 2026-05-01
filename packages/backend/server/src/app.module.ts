@@ -29,6 +29,7 @@ import { StorageProviderModule } from './base/storage';
 import { RateLimiterModule } from './base/throttler';
 import { WebSocketModule } from './base/websocket';
 import { AccessTokenModule } from './core/access-token';
+import { AdminInjectModule } from './core/admin-inject';
 import { AuthModule } from './core/auth';
 import { CommentModule } from './core/comment';
 import { ServerConfigModule, ServerConfigResolverModule } from './core/config';
@@ -175,7 +176,8 @@ export function buildAppModule(env: Env) {
       QuotaModule,
       DocStorageModule,
       NotificationModule,
-      MailModule
+      MailModule,
+      AdminInjectModule
     )
     // renderer server and front server
     .useIf(() => env.flavors.renderer || env.flavors.front, DocRendererModule)
