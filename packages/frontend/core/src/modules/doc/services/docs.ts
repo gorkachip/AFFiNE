@@ -297,6 +297,20 @@ export class DocsService extends Service {
     });
     targetDoc.updateProperties(properties);
 
+    // MOJO: nest the duplicate under the original. AFFiNE's sidebar
+    // tree shows linked docs as children of whichever doc references
+    // them, so dropping a LinkedPage reference into the source doc is
+    // enough to make the duplicate appear as a sub-doc.
+    try {
+      await this.addLinkedDoc(sourceDocId, targetDocId);
+    } catch (e) {
+      logger.warn('Failed to nest duplicate under source', {
+        sourceDocId,
+        targetDocId,
+        error: e,
+      });
+    }
+
     return targetDocId;
   }
 
