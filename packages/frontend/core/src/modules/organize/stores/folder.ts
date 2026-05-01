@@ -98,12 +98,22 @@ export class FolderStore extends Store {
       }
     }
 
+    // MOJO: every new folder is private by default — only the creator
+    // (and workspace owners/admins, who short-circuit the visibility
+    // check) can see it. The user can flip it to public from the
+    // folder's options menu later. Defaulting to private avoids the
+    // "I keep forgetting to set it private" leak.
+    const visibility = createdBy
+      ? JSON.stringify({ mode: 'restricted', users: [createdBy] })
+      : undefined;
+
     return this.dbService.db.folders.create({
       parentId: parentId,
       type: 'folder',
       data: name,
       index: index,
       createdBy,
+      visibility,
     }).id;
   }
 
