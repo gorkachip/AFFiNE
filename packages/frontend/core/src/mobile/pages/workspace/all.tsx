@@ -23,6 +23,8 @@ const AllDocs = () => {
       displayProperties: [
         'system:createdAt',
         'system:updatedAt',
+        'system:updatedBy',
+        'system:createdBy',
         'system:tags',
       ],
       view: 'masonry',

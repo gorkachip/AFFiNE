@@ -17,7 +17,7 @@ const TagDocs = ({ tag }: { tag: Tag }) => {
   const [explorerContextValue] = useState(() =>
     createDocExplorerContext({
       quickFavorite: true,
-      displayProperties: ['createdAt', 'updatedAt', 'tags'],
+      displayProperties: ['createdAt', 'updatedAt', 'updatedBy', 'tags'],
       view: 'masonry',
       showDragHandle: false,
       groupBy: undefined,
