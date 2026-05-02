@@ -2,7 +2,11 @@ import { LiveData, OnEvent, Service } from '@toeverything/infra';
 import { map } from 'rxjs';
 
 import type { WorkspaceDBService } from '../../db';
-import { type Workspace, WorkspaceInitialized } from '../../workspace';
+import {
+  type Workspace,
+  WorkspaceInitialized,
+  type WorkspaceService,
+} from '../../workspace';
 
 export interface DeadlineEntry {
   id: string; // `${docId}:${rowId}`
@@ -32,7 +36,10 @@ export class DeadlineIndexService extends Service {
     // for it yet.
   }
 
-  constructor(private readonly db: WorkspaceDBService) {
+  constructor(
+    private readonly db: WorkspaceDBService,
+    private readonly workspaceService: WorkspaceService
+  ) {
     super();
 
     // Install the bridge as soon as the service boots. The data-source
@@ -108,9 +115,30 @@ export class DeadlineIndexService extends Service {
     // interpreted as "match every field equals empty" and yield nothing.
     this.db.db.deadlines.find$().pipe(
       map(rows => {
-         
-        console.log('[mojo deadline] deadlines$ emit', rows.length, rows);
-        return rows.map(row => ({
+        // MOJO: drop entries pointing at docs that have been deleted
+        // from the workspace entirely (the kanban can't be reopened
+        // to bootstrap-clean those, so they'd otherwise live forever
+        // in the index). Also drop the entry if it was scheduled and
+        // also fire-and-forget delete it from the underlying table so
+        // the index converges. Trashed-row cleanup happens via the
+        // bootstrap scan in data-source.ts the next time the kanban
+        // is opened.
+        const collection = this.workspaceService.workspace.docCollection;
+        const validRows = rows.filter(row => {
+          if (!row.docId) return false;
+          const exists = collection.docs.has(row.docId);
+          if (!exists) {
+            // Stale entry — schedule a delete so it doesn't keep
+            // matching on every subsequent emission.
+            try {
+              this.db.db.deadlines.delete(row.id);
+            } catch {
+              // ignore — best effort
+            }
+          }
+          return exists;
+        });
+        return validRows.map(row => ({
           id: row.id,
           docId: row.docId ?? '',
           rowId: row.rowId ?? '',
