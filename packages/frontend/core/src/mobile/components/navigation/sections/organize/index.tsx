@@ -1,11 +1,12 @@
 import { Skeleton } from '@affine/component';
 import { NavigationPanelTreeRoot } from '@affine/core/desktop/components/navigation-panel';
+import { AuthService } from '@affine/core/modules/cloud';
 import { NavigationPanelService } from '@affine/core/modules/navigation-panel';
 import { OrganizeService } from '@affine/core/modules/organize';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
 import { AddOrganizeIcon } from '@blocksuite/icons/rc';
-import { useLiveData, useServices } from '@toeverything/infra';
+import { useLiveData, useService, useServices } from '@toeverything/infra';
 import { useCallback, useMemo, useState } from 'react';
 
 import { AddItemPlaceholder } from '../../layouts/add-item-placeholder';
@@ -18,6 +19,10 @@ export const NavigationPanelOrganize = () => {
     OrganizeService,
     NavigationPanelService,
   });
+  const authService = useService(AuthService);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
   const path = useMemo(() => ['organize'], []);
   const [openNewFolderDialog, setOpenNewFolderDialog] = useState(false);
 
@@ -33,13 +38,14 @@ export const NavigationPanelOrganize = () => {
     (name: string) => {
       const newFolderId = rootFolder.createFolder(
         name,
-        rootFolder.indexAt('before')
+        rootFolder.indexAt('before'),
+        currentUserId ?? undefined
       );
       track.$.navigationPanel.organize.createOrganizeItem({ type: 'folder' });
       navigationPanelService.setCollapsed(path, false);
       return newFolderId;
     },
-    [navigationPanelService, path, rootFolder]
+    [currentUserId, navigationPanelService, path, rootFolder]
   );
 
   return (

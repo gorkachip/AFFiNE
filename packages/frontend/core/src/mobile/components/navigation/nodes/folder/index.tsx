@@ -7,10 +7,12 @@ import {
   notify,
 } from '@affine/component';
 import { usePageHelper } from '@affine/core/blocksuite/block-suite-page-list/utils';
+import { FolderShareDialog } from '@affine/core/components/folder-share-dialog';
 import type {
   NavigationPanelTreeNodeIcon,
   NodeOperation,
 } from '@affine/core/desktop/components/navigation-panel';
+import { AuthService } from '@affine/core/modules/cloud';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
@@ -30,11 +32,12 @@ import {
   PlusIcon,
   PlusThickIcon,
   RemoveFolderIcon,
+  ShareIcon,
   TagsIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
 import { difference } from 'lodash-es';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { AddItemPlaceholder } from '../../layouts/add-item-placeholder';
 import { NavigationPanelTreeNode } from '../../tree/node';
@@ -146,6 +149,11 @@ const NavigationPanelFolderNodeFolder = ({
       FeatureFlagService,
       WorkspaceDialogService,
     });
+  const authService = useService(AuthService);
+  const currentUserId = useLiveData(
+    authService.session.account$.map(a => a?.id ?? null)
+  );
+  const [shareOpen, setShareOpen] = useState(false);
   const name = useLiveData(node.name$);
   const enableEmojiIcon = useLiveData(
     featureFlagService.flags.enable_emoji_folder_icon.$
@@ -201,11 +209,15 @@ const NavigationPanelFolderNodeFolder = ({
 
   const handleCreateSubfolder = useCallback(
     (name: string) => {
-      node.createFolder(name, node.indexAt('before'));
+      node.createFolder(
+        name,
+        node.indexAt('before'),
+        currentUserId ?? undefined
+      );
       track.$.navigationPanel.organize.createOrganizeItem({ type: 'folder' });
       setCollapsed(false);
     },
-    [node, setCollapsed]
+    [currentUserId, node, setCollapsed]
   );
 
   const handleAddToFolder = useCallback(
@@ -348,6 +360,22 @@ const NavigationPanelFolderNodeFolder = ({
         ),
       },
 
+      // MOJO: opens the same FolderShareDialog the desktop uses, so
+      // mobile members can flip a folder's visibility / add other
+      // users to its access list. Without this, the private-by-default
+      // change leaves mobile users unable to share their folders.
+      {
+        index: 150,
+        view: (
+          <MenuItem
+            prefixIcon={<ShareIcon />}
+            onClick={() => setShareOpen(true)}
+          >
+            Share folder
+          </MenuItem>
+        ),
+      },
+
       {
         index: 200,
         view: node.id ? <FavoriteFolderOperation id={node.id} /> : null,
@@ -426,30 +454,37 @@ const NavigationPanelFolderNodeFolder = ({
   );
 
   return (
-    <NavigationPanelTreeNode
-      icon={NavigationPanelFolderIcon}
-      name={name}
-      extractEmojiAsIcon={enableEmojiIcon}
-      collapsed={collapsed}
-      setCollapsed={handleCollapsedChange}
-      operations={finalOperations}
-      data-testid={`navigation-panel-folder-${node.id}`}
-      aria-label={name}
-      data-role="navigation-panel-folder"
-    >
-      {children.map(child => (
-        <NavigationPanelFolderNode
-          key={child.id}
-          nodeId={child.id as string}
-          operations={childrenOperations}
-          parentPath={path}
+    <>
+      <NavigationPanelTreeNode
+        icon={NavigationPanelFolderIcon}
+        name={name}
+        extractEmojiAsIcon={enableEmojiIcon}
+        collapsed={collapsed}
+        setCollapsed={handleCollapsedChange}
+        operations={finalOperations}
+        data-testid={`navigation-panel-folder-${node.id}`}
+        aria-label={name}
+        data-role="navigation-panel-folder"
+      >
+        {children.map(child => (
+          <NavigationPanelFolderNode
+            key={child.id}
+            nodeId={child.id as string}
+            operations={childrenOperations}
+            parentPath={path}
+          />
+        ))}
+        <AddItemPlaceholder
+          label={t['com.affine.rootAppSidebar.organize.folder.new-doc']()}
+          onClick={handleNewDoc}
+          data-testid="new-folder-in-folder-button"
         />
-      ))}
-      <AddItemPlaceholder
-        label={t['com.affine.rootAppSidebar.organize.folder.new-doc']()}
-        onClick={handleNewDoc}
-        data-testid="new-folder-in-folder-button"
+      </NavigationPanelTreeNode>
+      <FolderShareDialog
+        folder={node}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
       />
-    </NavigationPanelTreeNode>
+    </>
   );
 };
