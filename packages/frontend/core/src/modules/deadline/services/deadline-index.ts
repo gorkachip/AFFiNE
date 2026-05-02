@@ -126,8 +126,13 @@ export class DeadlineIndexService extends Service {
         const collection = this.workspaceService.workspace.docCollection;
         const validRows = rows.filter(row => {
           if (!row.docId) return false;
-          const exists = collection.docs.has(row.docId);
-          if (!exists) {
+          // collection.docs.has stays true even for docs the user has
+          // moved to trash, so also check meta.trash. Otherwise a
+          // trashed doc keeps surfacing its old deadline entries.
+          const docMeta = collection.meta.getDocMeta(row.docId);
+          const docExists = collection.docs.has(row.docId);
+          const isAlive = docExists && !docMeta?.trash;
+          if (!isAlive) {
             // Stale entry — schedule a delete so it doesn't keep
             // matching on every subsequent emission.
             try {
@@ -136,7 +141,7 @@ export class DeadlineIndexService extends Service {
               // ignore — best effort
             }
           }
-          return exists;
+          return isAlive;
         });
         return validRows.map(row => ({
           id: row.id,
