@@ -5,6 +5,7 @@ import {
 } from '@blocksuite/affine-components/context-menu';
 import {
   ArrowRightBigIcon,
+  DateTimeIcon,
   DeleteIcon,
   ExpandFullIcon,
   MoveLeftIcon,
@@ -39,6 +40,23 @@ export const popCardMenu = (
               view: kanbanViewLogic.view,
               rowId: cardId,
             });
+          },
+        }),
+        // MOJO: same hook as the desktop menu — fires the global event
+        // the React MojoAuthBridge listens to, which pops the per-card
+        // activity log modal.
+        menu.action({
+          name: 'Activity',
+          prefix: DateTimeIcon(),
+          select: () => {
+            if (typeof document === 'undefined' || !document.dispatchEvent) {
+              return;
+            }
+            document.dispatchEvent(
+              new CustomEvent('mojo-card-activity', {
+                detail: { rowId: cardId },
+              })
+            );
           },
         }),
       ],
