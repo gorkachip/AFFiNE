@@ -297,67 +297,6 @@ export class DocsService extends Service {
     });
     targetDoc.updateProperties(properties);
 
-    // MOJO: nest the duplicate under the original by appending a
-    // LinkedPage reference to the source. Caveat: if the user later
-    // moves the duplicate via the sidebar, AFFiNE keeps the link in
-    // the source so the duplicate appears in both places — to remove
-    // the nested copy, open the source doc and delete the link line
-    // at the bottom.
-    console.log('[mojo duplicate] nesting', { sourceDocId, targetDocId });
-    try {
-      const { doc, release } = this.open(sourceDocId);
-      const disposePriority = doc.addPriorityLoad(10);
-      await doc.waitForSyncReady();
-      disposePriority();
-      const bsDoc = doc.blockSuiteDoc;
-      let [frame] = bsDoc.getBlocksByFlavour('affine:note');
-      console.log('[mojo duplicate] note frame', {
-        found: !!frame,
-        rootChildren: bsDoc.root?.children.length,
-      });
-      if (!frame && bsDoc.root) {
-        // Source has no note (rare — empty doc, edgeless-only, etc.).
-        // Materialise one so the link has a parent to live under.
-        const noteId = bsDoc.addBlock(
-          'affine:note' as never,
-          {},
-          bsDoc.root.id
-        );
-        frame = bsDoc.getBlock(noteId)?.model as never;
-        console.log('[mojo duplicate] created note', { noteId });
-      }
-      if (frame) {
-        const text = new Text([
-          {
-            insert: ' ',
-            attributes: {
-              reference: { type: 'LinkedPage', pageId: targetDocId },
-            },
-          },
-        ] as DeltaInsert<AffineTextAttributes>[]);
-        const newBlockId = bsDoc.addBlock(
-          'affine:paragraph' as never,
-          { text },
-          frame.id
-        );
-        console.log('[mojo duplicate] linked', { newBlockId });
-      } else {
-        console.warn('[mojo duplicate] could not find or create note frame');
-      }
-      release();
-    } catch (e) {
-      console.error('[mojo duplicate] nest failed', {
-        sourceDocId,
-        targetDocId,
-        error: e,
-      });
-      logger.warn('Failed to nest duplicate under source', {
-        sourceDocId,
-        targetDocId,
-        error: e,
-      });
-    }
-
     return targetDocId;
   }
 
