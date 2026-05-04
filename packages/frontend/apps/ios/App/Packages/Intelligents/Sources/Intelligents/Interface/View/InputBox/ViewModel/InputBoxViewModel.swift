@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - Data Models
 
-public struct InputBoxData {
+public struct InputBoxData: @unchecked Sendable {
   public var text: String
   public var imageAttachments: [ImageAttachment]
   public var fileAttachments: [FileAttachment] = []

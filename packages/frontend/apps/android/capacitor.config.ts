@@ -12,8 +12,11 @@ interface AppConfig {
 }
 
 const config: CapacitorConfig & AppConfig = {
-  appId: 'app.affine.pro',
-  appName: 'AFFiNE',
+  // MOJO branded mobile shell — points at the self-hosted MOJO Notion
+  // backend so all features deployed to the web automatically appear
+  // in the app without rebuilding.
+  appId: 'com.mojodevelopments.notion',
+  appName: 'MOJO Notion',
   webDir: 'dist',
   affineVersion: packageJson.version,
   android: {
@@ -28,7 +31,8 @@ const config: CapacitorConfig & AppConfig = {
     adjustMarginsForEdgeToEdge: 'force',
   },
   server: {
-    cleartext: true,
+    url: 'https://notion.mojodevelopments.com',
+    cleartext: false,
   },
   plugins: {
     CapacitorHttp: {

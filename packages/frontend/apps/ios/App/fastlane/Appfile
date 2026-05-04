@@ -1,8 +1,8 @@
-app_identifier("app.affine.pro") # The bundle identifier of your app
-apple_id("yinan.long@toeverything.info") # Your Apple Developer Portal username
+app_identifier("com.mojodevelopments.notion") # The bundle identifier of your app
+# apple_id("notion@mojodevelopments.com") # Your Apple Developer Portal username — fill in if using fastlane
 
-itc_team_id("126219637") # App Store Connect Team ID
-team_id("73YMMDVT2M") # Developer Portal Team ID
+# itc_team_id("YOUR_ITC_TEAM_ID") # App Store Connect Team ID — fill in if using fastlane
+# team_id("YOUR_TEAM_ID") # Developer Portal Team ID — fill in if using fastlane
 
 # For more information about the Appfile, see:
 #     https://docs.fastlane.tools/advanced/#appfile
