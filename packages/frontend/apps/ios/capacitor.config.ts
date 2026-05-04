@@ -28,12 +28,6 @@ const config: CapacitorConfig & AppConfig = {
   server: {
     url: 'https://notion.mojodevelopments.com',
     cleartext: false,
-    // MOJO: keep every navigation inside the WebView. By default
-    // Capacitor only allowlists the server's host and hands off
-    // anything else (oauth providers, attachment hosts, external
-    // links in docs…) to Safari. Wildcard = tap on any link stays
-    // in-app.
-    allowNavigation: ['*'],
   },
   plugins: {
     // Bridge WKWebView's in-process cookie store with the system

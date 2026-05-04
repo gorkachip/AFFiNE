@@ -15,6 +15,12 @@ import {
 import { useLiveData, useService } from '@toeverything/infra';
 import { type ReactElement, type SVGAttributes, useCallback } from 'react';
 
+import {
+  isCapacitor,
+  MOJO_NATIVE_CLIENT,
+  openInCapacitorBrowser,
+} from './capacitor-oauth';
+
 const OAuthProviderMap: Record<
   OAuthProviderType,
   {
@@ -51,36 +57,55 @@ export function OAuth({ redirectUrl }: { redirectUrl?: string }) {
     async (provider: OAuthProviderType) => {
       track.$.$.auth.signIn({ method: 'oauth', provider });
 
-      const open: () => Promise<void> | void = BUILD_CONFIG.isNative
-        ? async () => {
-            try {
-              const scheme = urlService.getClientScheme();
-              const options = await auth.oauthPreflight(
-                provider,
-                scheme ?? 'web'
-              );
-              urlService.openPopupWindow(options.url);
-            } catch (e) {
-              notify.error(UserFriendlyError.fromAny(e));
+      // MOJO: when the deployed web bundle is running inside our native
+      // Capacitor shell, Google OAuth in the WKWebView is rejected
+      // ("Access blocked: app's request does not comply with Google's
+      // policies"). Detect Capacitor at runtime and route OAuth through
+      // the in-app Safari sheet (SFSafariViewController) instead.
+      const useCapacitorOAuth = isCapacitor();
+
+      const open: () => Promise<void> | void =
+        BUILD_CONFIG.isNative || useCapacitorOAuth
+          ? async () => {
+              try {
+                const scheme = useCapacitorOAuth
+                  ? MOJO_NATIVE_CLIENT
+                  : (urlService.getClientScheme() ?? 'web');
+                const options = await auth.oauthPreflight(provider, scheme);
+                if (useCapacitorOAuth) {
+                  // Route through the native Browser plugin so the URL
+                  // never touches the WKWebView (Google would block it).
+                  // The callback returns to the app via the
+                  // `mojonotion://` scheme handled in the appUrlOpen
+                  // listener.
+                  const opened = await openInCapacitorBrowser(options.url);
+                  if (!opened) {
+                    urlService.openPopupWindow(options.url);
+                  }
+                } else {
+                  urlService.openPopupWindow(options.url);
+                }
+              } catch (e) {
+                notify.error(UserFriendlyError.fromAny(e));
+              }
             }
-          }
-        : () => {
-            const params = new URLSearchParams();
+          : () => {
+              const params = new URLSearchParams();
 
-            params.set('provider', provider);
+              params.set('provider', provider);
 
-            if (redirectUrl) {
-              params.set('redirect_uri', redirectUrl);
-            }
+              if (redirectUrl) {
+                params.set('redirect_uri', redirectUrl);
+              }
 
-            params.set('flow', 'redirect');
+              params.set('flow', 'redirect');
 
-            const oauthUrl =
-              serverService.server.baseUrl +
-              `/oauth/login?${params.toString()}`;
+              const oauthUrl =
+                serverService.server.baseUrl +
+                `/oauth/login?${params.toString()}`;
 
-            urlService.openExternal(oauthUrl);
-          };
+              urlService.openExternal(oauthUrl);
+            };
 
       const ret = open();
 

@@ -6,6 +6,9 @@ export const appSchemes = z.enum([
   'affine-beta',
   'affine-internal',
   'affine-dev',
+  // MOJO: native iOS/Android shells use this scheme so OAuth and other
+  // deep links can hop from the in-app Safari sheet back into the app.
+  'mojonotion',
 ]);
 
 export type Scheme = z.infer<typeof appSchemes>;
