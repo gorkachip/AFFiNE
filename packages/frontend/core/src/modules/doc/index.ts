@@ -30,6 +30,7 @@ export function configureDocModule(framework: Framework) {
       DocsStore,
       DocPropertiesStore,
       [DocCreateMiddleware],
+      WorkspaceDBService,
     ])
     .store(DocPropertiesStore, [WorkspaceService, WorkspaceDBService])
     .store(DocsStore, [WorkspaceService, DocPropertiesStore])

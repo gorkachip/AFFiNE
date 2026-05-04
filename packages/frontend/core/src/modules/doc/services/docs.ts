@@ -4,10 +4,15 @@ import { replaceIdMiddleware } from '@blocksuite/affine/shared/adapters';
 import type { AffineTextAttributes } from '@blocksuite/affine/shared/types';
 import type { DeltaInsert } from '@blocksuite/affine/store';
 import { Slice, Text, Transformer } from '@blocksuite/affine/store';
-import { ObjectPool, Service } from '@toeverything/infra';
+import {
+  generateFractionalIndexingKeyBetween,
+  ObjectPool,
+  Service,
+} from '@toeverything/infra';
 import { combineLatest, map } from 'rxjs';
 
 import { initDocFromProps } from '../../../blocksuite/initialization';
+import type { WorkspaceDBService } from '../../db';
 import { getAFFiNEWorkspaceSchema } from '../../workspace/global-schema';
 import type { Doc } from '../entities/doc';
 import { DocRecordList } from '../entities/record-list';
@@ -89,7 +94,8 @@ export class DocsService extends Service {
   constructor(
     private readonly store: DocsStore,
     private readonly docPropertiesStore: DocPropertiesStore,
-    private readonly docCreateMiddlewares: DocCreateMiddleware[]
+    private readonly docCreateMiddlewares: DocCreateMiddleware[],
+    private readonly db: WorkspaceDBService
   ) {
     super();
   }
@@ -297,7 +303,53 @@ export class DocsService extends Service {
     });
     targetDoc.updateProperties(properties);
 
+    // MOJO: drop the duplicate next to its source in the sidebar tree.
+    // If the source lives in a folder, mirror that placement so the
+    // user finds the copy where they expect it (instead of root).
+    this._placeDuplicateInSourceFolder(sourceDocId, targetDocId);
+
     return targetDocId;
+  }
+
+  private _placeDuplicateInSourceFolder(
+    sourceDocId: string,
+    targetDocId: string
+  ) {
+    try {
+      const links = this.db.db.folders.find({
+        type: 'doc',
+        data: sourceDocId,
+      });
+      // First non-trashed parent wins. A doc can technically be linked
+      // from multiple folders; mirroring all of them would create N
+      // copies of the duplicate, which is more confusing than helpful.
+      const link = links.find(l => {
+        if (!l.parentId) return false;
+        const parent = this.db.db.folders.get(l.parentId);
+        return !!parent && parent.type === 'folder' && !parent.trashed;
+      });
+      if (!link?.parentId) return;
+      const siblings = this.db.db.folders.find({ parentId: link.parentId });
+      const lastIndex =
+        siblings
+          .map(s => s.index ?? '')
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? null;
+      const newIndex = generateFractionalIndexingKeyBetween(lastIndex, null);
+      this.db.db.folders.create({
+        parentId: link.parentId,
+        type: 'doc',
+        data: targetDocId,
+        index: newIndex,
+      });
+    } catch (e) {
+      logger.warn('Failed to place duplicate in source folder', {
+        sourceDocId,
+        targetDocId,
+        error: e,
+      });
+    }
   }
 
   /**
