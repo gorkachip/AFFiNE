@@ -1,13 +1,17 @@
 import Capacitor
 import Intelligents
 import UIKit
+import WebKit
 
-class AFFiNEViewController: CAPBridgeViewController {
+class AFFiNEViewController: CAPBridgeViewController, WKUIDelegate {
   var intelligentsButton: IntelligentsButton?
 
   override func viewDidLoad() {
     super.viewDidLoad()
     webView?.allowsBackForwardNavigationGestures = true
+    // MOJO: claim the WKUIDelegate so target="_blank" / window.open
+    // calls land in the same WebView instead of dropping out to Safari.
+    webView?.uiDelegate = self
     navigationController?.navigationBar.isHidden = true
     extendedLayoutIncludesOpaqueBars = false
     edgesForExtendedLayout = []
@@ -110,5 +114,21 @@ class AFFiNEViewController: CAPBridgeViewController {
   override func viewDidDisappear(_ animated: Bool) {
     super.viewDidDisappear(animated)
     intelligentsButtonTimer?.invalidate()
+  }
+
+  // MOJO: WKWebView's default behaviour for window.open / target="_blank"
+  // is to return nil here and the link silently dies. Capacitor's fallback
+  // then forwards the URL to Safari. Load it in the existing WebView
+  // instead so the user never leaves the app.
+  func webView(
+    _ webView: WKWebView,
+    createWebViewWith _: WKWebViewConfiguration,
+    for navigationAction: WKNavigationAction,
+    windowFeatures _: WKWindowFeatures
+  ) -> WKWebView? {
+    if let url = navigationAction.request.url, navigationAction.targetFrame == nil {
+      webView.load(URLRequest(url: url))
+    }
+    return nil
   }
 }

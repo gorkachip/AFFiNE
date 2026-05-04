@@ -302,7 +302,10 @@ export const AFFINE_FLAGS = {
     displayName: 'Enable Mobile Database Editing',
     description: 'Enable mobile database editing',
     configurable: isMobile,
-    defaultState: false,
+    // MOJO: kanban editing on mobile is a primary use case for us, so
+    // default the flag on instead of making every user dig into
+    // experimental settings to enable it.
+    defaultState: true,
   },
   enable_pdfmake_export: {
     category: 'blocksuite',
