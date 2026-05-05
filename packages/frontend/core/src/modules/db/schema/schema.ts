@@ -96,6 +96,23 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     title: f.string().optional(),
   },
   /**
+   * MOJO: per-deadline UI state shared across the workspace (so a
+   * snooze or "Mark done" applied on one device propagates to every
+   * member). Kept in its own table on purpose — the previous attempt
+   * to extend the `deadlines` table itself crashed boot for clients
+   * with existing data, so we sidestep that risk by leaving the
+   * deadlines table untouched.
+   */
+  deadlineState: {
+    // matches deadlines.id (`${docId}:${rowId}`)
+    id: f.string().primaryKey(),
+    done: f.boolean().optional(),
+    snoozedUntil: f.number().optional(),
+    /** Audit: who last touched this state row. */
+    updatedBy: f.string().optional(),
+    updatedAt: f.number().optional(),
+  },
+  /**
    * MOJO: append-only activity log for kanban cards (rows). Surfaced in
    * a per-card "Activity" modal triggered from the card's "..." menu.
    * Written automatically by the database data-source whenever a cell
