@@ -12,7 +12,17 @@ import Capacitor
 import Foundation
 
 @objc(MojoOAuthPlugin)
-public class MojoOAuthPlugin: CAPPlugin, ASWebAuthenticationPresentationContextProviding {
+public class MojoOAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPresentationContextProviding {
+  // Capacitor 7 only exposes plugins to JS that conform to
+  // CAPBridgedPlugin and declare their identifier/jsName/pluginMethods
+  // — without these the plugin loads fine on the native side but
+  // window.Capacitor.Plugins.MojoOAuth is undefined in the WebView.
+  public let identifier = "MojoOAuthPlugin"
+  public let jsName = "MojoOAuth"
+  public let pluginMethods: [CAPPluginMethod] = [
+    CAPPluginMethod(name: "startAuthSession", returnType: CAPPluginReturnPromise),
+  ]
+
   private var activeSession: ASWebAuthenticationSession?
 
   override public func load() {
@@ -26,7 +36,7 @@ public class MojoOAuthPlugin: CAPPlugin, ASWebAuthenticationPresentationContextP
     return ASPresentationAnchor()
   }
 
-  @objc func startAuthSession(_ call: CAPPluginCall) {
+  @objc public func startAuthSession(_ call: CAPPluginCall) {
     guard
       let urlString = call.getString("url"),
       let authURL = URL(string: urlString)

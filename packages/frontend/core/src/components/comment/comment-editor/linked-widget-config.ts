@@ -106,8 +106,12 @@ export const createCommentLinkedWidgetConfig = (
       const members = memberSearchService.result$.signal.value;
 
       if (query.length === 0) {
+        // MOJO: surface up to 20 members on first open so the user
+        // can scroll the popover (its CSS already has overflow: auto)
+        // instead of being stuck with the first 3 + a "more" hint
+        // that has no way to expand.
         return members
-          .slice(0, 3)
+          .slice(0, 20)
           .map(member => getMenuItem(member.id, member.name, member.avatarUrl));
       }
 
@@ -145,10 +149,10 @@ export const createCommentLinkedWidgetConfig = (
           !memberSearchService.isLoading$.signal.value
         );
       }),
-      maxDisplay: 3,
+      maxDisplay: 20,
       overflowText: computed(() => {
         const totalCount = memberSearchService.result$.signal.value.length;
-        const remainingCount = totalCount - 3;
+        const remainingCount = totalCount - 20;
         return I18n.t('com.affine.editor.at-menu.more-members-hint', {
           count: remainingCount,
         });

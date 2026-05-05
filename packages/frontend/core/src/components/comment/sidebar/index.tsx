@@ -1027,6 +1027,7 @@ const useCommentEntity = (docId: string | undefined) => {
 export const CommentSidebar = () => {
   const doc = useServiceOptional(DocService)?.doc;
   const entity = useCommentEntity(doc?.id);
+  const workbench = useService(WorkbenchService).workbench;
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1053,15 +1054,49 @@ export const CommentSidebar = () => {
         entity.dismissDraftComment();
       }
     };
+    // MOJO: tapping outside the comments panel should close it.
+    // Run in the capture phase + stopImmediatePropagation so the
+    // underlying element (a kanban card, a doc block, a button…)
+    // does not also fire from the same tap. The user's intent here
+    // is "dismiss this overlay" — they don't want the click to
+    // double as a navigation/edit action elsewhere.
+    const handleOutsideMouseDown = (event: MouseEvent) => {
+      if (!container) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (container.contains(target)) return;
+      // Ignore clicks on the comment trigger / popover anchored
+      // inside the editor itself, otherwise re-opening would feel
+      // like a no-op (close → caller re-opens immediately).
+      if (target.closest('[data-comment-trigger]')) return;
+      // Only intercept while the panel is actually visible.
+      if (!workbench.sidebarOpen$.value) return;
+      const activeView = workbench.activeView$.value;
+      if (activeView?.activeSidebarTab$.value?.id !== 'comment') return;
+      workbench.closeSidebar();
+      event.stopImmediatePropagation();
+      event.preventDefault();
+    };
     document.addEventListener('keydown', handleKeyDown);
     container?.addEventListener('click', handleContainerClick);
+    document.addEventListener('mousedown', handleOutsideMouseDown, true);
+    document.addEventListener('touchstart', handleOutsideMouseDown as never, {
+      capture: true,
+      passive: false,
+    });
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       container?.removeEventListener('click', handleContainerClick);
+      document.removeEventListener('mousedown', handleOutsideMouseDown, true);
+      document.removeEventListener(
+        'touchstart',
+        handleOutsideMouseDown as never,
+        true
+      );
       entity?.highlightComment(null);
     };
-  }, [entity]);
+  }, [entity, workbench]);
 
   if (!entity) {
     return null;

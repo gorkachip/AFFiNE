@@ -44,6 +44,12 @@ export class MultiTagView extends WithDisposable(ShadowlessElement) {
       overflow: hidden;
       text-overflow: ellipsis;
       border: 1px solid ${unsafeCSSVarV2('database/border')};
+      /* MOJO: chip backgrounds are pastel V2 colours and never
+         shift between light and dark themes, so the inherited
+         text colour (which DOES flip in dark mode) ends up white
+         on a light pastel — illegible. Pin a dark colour so the
+         label stays readable in both themes. */
+      color: rgba(0, 0, 0, 0.85);
     }
   `;
 
