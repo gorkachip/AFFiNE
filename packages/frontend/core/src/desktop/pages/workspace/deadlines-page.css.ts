@@ -90,3 +90,52 @@ export const cardDate = style({
   fontSize: cssVar('fontSm'),
   flexShrink: 0,
 });
+
+export const cardDateOverdue = style({
+  color: cssVar('errorColor'),
+  fontWeight: 600,
+});
+
+export const cardDateSnoozed = style({
+  fontStyle: 'italic',
+});
+
+export const rowActions = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  flexShrink: 0,
+});
+
+export const actionButton = style({
+  border: 'none',
+  background: 'transparent',
+  color: cssVar('textSecondaryColor'),
+  fontSize: cssVar('fontXs'),
+  padding: '4px 8px',
+  borderRadius: 4,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  selectors: {
+    '&:hover': {
+      background: cssVar('hoverColor'),
+      color: cssVar('textPrimaryColor'),
+    },
+  },
+});
+
+export const actionButtonPrimary = style([
+  actionButton,
+  {
+    color: cssVar('primaryColor'),
+    fontWeight: 500,
+  },
+]);
+
+export const rowDone = style({
+  opacity: 0.55,
+});
+
+export const cardTitleStrike = style({
+  textDecoration: 'line-through',
+});
