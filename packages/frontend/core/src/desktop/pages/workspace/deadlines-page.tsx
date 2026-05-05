@@ -252,13 +252,7 @@ const DeadlineRow = ({
       className={`${styles.row}${variant === 'done' ? ` ${styles.rowDone}` : ''}`}
       onClick={() => onOpen(entry)}
     >
-      <span
-        className={`${styles.cardTitle}${
-          variant === 'done' ? ` ${styles.cardTitleStrike}` : ''
-        }`}
-      >
-        {entry.title || 'Untitled card'}
-      </span>
+      <span className={styles.cardTitle}>{entry.title || 'Untitled card'}</span>
       <span
         className={`${styles.cardDate}${
           variant === 'overdue' ? ` ${styles.cardDateOverdue}` : ''
