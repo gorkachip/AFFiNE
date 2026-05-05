@@ -23,7 +23,9 @@ function startOfDay(ts: number): number {
   return d.getTime();
 }
 
-function bucketFor(deadline: number, todayStart: number): string {
+type Bucket = 'Overdue' | 'Today' | 'Tomorrow' | 'This week' | 'Upcoming';
+
+function bucketFor(deadline: number, todayStart: number): Bucket {
   const day = 24 * 60 * 60 * 1000;
   const diff = startOfDay(deadline) - todayStart;
   if (diff < 0) return 'Overdue';
@@ -33,13 +35,13 @@ function bucketFor(deadline: number, todayStart: number): string {
   return 'Upcoming';
 }
 
-const BUCKET_ORDER = [
+const ACTIVE_BUCKET_ORDER: Bucket[] = [
   'Overdue',
   'Today',
   'Tomorrow',
   'This week',
   'Upcoming',
-] as const;
+];
 
 export const DeadlinesPage = () => {
   const deadlineIndex = useService(DeadlineIndexService);
@@ -60,29 +62,44 @@ export const DeadlinesPage = () => {
     if (!currentUserId) return [];
     return all.filter(
       entry =>
-        entry.deadline >= nowSnapshot &&
-        (entry.createdBy === currentUserId ||
-          entry.memberIds.includes(currentUserId))
+        entry.createdBy === currentUserId ||
+        entry.memberIds.includes(currentUserId)
     );
-  }, [all, currentUserId, nowSnapshot]);
+  }, [all, currentUserId]);
 
-  const grouped = useMemo(() => {
+  const { active, done } = useMemo(() => {
     const todayStart = startOfDay(nowSnapshot);
-    const buckets: Record<string, DeadlineEntry[]> = {
+    const activeBuckets: Record<Bucket, DeadlineEntry[]> = {
       Overdue: [],
       Today: [],
       Tomorrow: [],
       'This week': [],
       Upcoming: [],
     };
+    const doneList: DeadlineEntry[] = [];
     for (const entry of visible) {
-      const key = bucketFor(entry.deadline, todayStart);
-      buckets[key]?.push(entry);
+      if (entry.done) {
+        doneList.push(entry);
+        continue;
+      }
+      const effective = DeadlineIndexService.effectiveDeadline(entry);
+      const key = bucketFor(effective, todayStart);
+      activeBuckets[key].push(entry);
     }
-    for (const key of Object.keys(buckets)) {
-      buckets[key].sort((a, b) => a.deadline - b.deadline);
+    for (const key of Object.keys(activeBuckets) as Bucket[]) {
+      activeBuckets[key].sort(
+        (a, b) =>
+          DeadlineIndexService.effectiveDeadline(a) -
+          DeadlineIndexService.effectiveDeadline(b)
+      );
     }
-    return buckets;
+    // Most recently completed first.
+    doneList.sort(
+      (a, b) =>
+        DeadlineIndexService.effectiveDeadline(b) -
+        DeadlineIndexService.effectiveDeadline(a)
+    );
+    return { active: activeBuckets, done: doneList };
   }, [visible, nowSnapshot]);
 
   const handleOpen = useCallback(
@@ -95,6 +112,20 @@ export const DeadlinesPage = () => {
       );
     },
     [workbench]
+  );
+
+  const handleMarkDone = useCallback(
+    (entry: DeadlineEntry, done: boolean) => {
+      deadlineIndex.markDone(entry.id, done);
+    },
+    [deadlineIndex]
+  );
+
+  const handleSnooze = useCallback(
+    (entry: DeadlineEntry, days: number) => {
+      deadlineIndex.snoozeByDays(entry.id, days);
+    },
+    [deadlineIndex]
   );
 
   const isEmpty = visible.length === 0;
@@ -119,37 +150,165 @@ export const DeadlinesPage = () => {
             <div className={styles.empty}>No deadlines assigned to you.</div>
           )}
           {!isEmpty &&
-            BUCKET_ORDER.map(bucket => {
-              const items = grouped[bucket];
-              if (!items || items.length === 0) return null;
+            ACTIVE_BUCKET_ORDER.map(bucket => {
+              const items = active[bucket];
+              if (items.length === 0) return null;
               return (
-                <section key={bucket} className={styles.bucket}>
-                  <h3 className={styles.bucketHeader}>
-                    {bucket}
-                    <span className={styles.bucketCount}>{items.length}</span>
-                  </h3>
-                  <ul className={styles.list}>
-                    {items.map(entry => (
-                      <li
-                        key={entry.id}
-                        className={styles.row}
-                        onClick={() => handleOpen(entry)}
-                      >
-                        <span className={styles.cardTitle}>
-                          {entry.title || 'Untitled card'}
-                        </span>
-                        <span className={styles.cardDate}>
-                          {new Date(entry.deadline).toLocaleDateString()}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                <DeadlineSection
+                  key={bucket}
+                  title={bucket}
+                  entries={items}
+                  variant={bucket === 'Overdue' ? 'overdue' : 'active'}
+                  onOpen={handleOpen}
+                  onMarkDone={handleMarkDone}
+                  onSnooze={handleSnooze}
+                />
               );
             })}
+          {done.length > 0 && (
+            <DeadlineSection
+              title="Done"
+              entries={done}
+              variant="done"
+              onOpen={handleOpen}
+              onMarkDone={handleMarkDone}
+              onSnooze={handleSnooze}
+            />
+          )}
         </div>
       </ViewBody>
     </>
+  );
+};
+
+interface DeadlineSectionProps {
+  title: string;
+  entries: DeadlineEntry[];
+  variant: 'overdue' | 'active' | 'done';
+  onOpen: (entry: DeadlineEntry) => void;
+  onMarkDone: (entry: DeadlineEntry, done: boolean) => void;
+  onSnooze: (entry: DeadlineEntry, days: number) => void;
+}
+
+const DeadlineSection = ({
+  title,
+  entries,
+  variant,
+  onOpen,
+  onMarkDone,
+  onSnooze,
+}: DeadlineSectionProps) => {
+  return (
+    <section className={styles.bucket}>
+      <h3 className={styles.bucketHeader}>
+        {title}
+        <span className={styles.bucketCount}>{entries.length}</span>
+      </h3>
+      <ul className={styles.list}>
+        {entries.map(entry => (
+          <DeadlineRow
+            key={entry.id}
+            entry={entry}
+            variant={variant}
+            onOpen={onOpen}
+            onMarkDone={onMarkDone}
+            onSnooze={onSnooze}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+};
+
+interface DeadlineRowProps {
+  entry: DeadlineEntry;
+  variant: 'overdue' | 'active' | 'done';
+  onOpen: (entry: DeadlineEntry) => void;
+  onMarkDone: (entry: DeadlineEntry, done: boolean) => void;
+  onSnooze: (entry: DeadlineEntry, days: number) => void;
+}
+
+const DeadlineRow = ({
+  entry,
+  variant,
+  onOpen,
+  onMarkDone,
+  onSnooze,
+}: DeadlineRowProps) => {
+  const effective = DeadlineIndexService.effectiveDeadline(entry);
+  const isSnoozed = entry.snoozedUntil != null && effective !== entry.deadline;
+  const dateLabel = `${new Date(effective).toLocaleDateString()}${
+    isSnoozed ? ' (snoozed)' : ''
+  }`;
+
+  // Stop propagation so action buttons don't also open the doc.
+  const stopThen = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+
+  return (
+    <li
+      className={`${styles.row}${variant === 'done' ? ` ${styles.rowDone}` : ''}`}
+      onClick={() => onOpen(entry)}
+    >
+      <span className={styles.cardTitle}>{entry.title || 'Untitled card'}</span>
+      <span
+        className={`${styles.cardDate}${
+          variant === 'overdue' ? ` ${styles.cardDateOverdue}` : ''
+        }${isSnoozed ? ` ${styles.cardDateSnoozed}` : ''}`}
+      >
+        {dateLabel}
+      </span>
+      <div className={styles.rowActions}>
+        {variant === 'overdue' && (
+          <>
+            <button
+              type="button"
+              className={styles.actionButton}
+              title="Snooze 1 day"
+              onClick={stopThen(() => onSnooze(entry, 1))}
+            >
+              +1d
+            </button>
+            <button
+              type="button"
+              className={styles.actionButton}
+              title="Snooze 3 days"
+              onClick={stopThen(() => onSnooze(entry, 3))}
+            >
+              +3d
+            </button>
+            <button
+              type="button"
+              className={styles.actionButton}
+              title="Snooze 1 week"
+              onClick={stopThen(() => onSnooze(entry, 7))}
+            >
+              +1w
+            </button>
+          </>
+        )}
+        {variant !== 'done' && (
+          <button
+            type="button"
+            className={styles.actionButtonPrimary}
+            onClick={stopThen(() => onMarkDone(entry, true))}
+          >
+            Mark done
+          </button>
+        )}
+        {variant === 'done' && (
+          <button
+            type="button"
+            className={styles.actionButton}
+            onClick={stopThen(() => onMarkDone(entry, false))}
+          >
+            Reopen
+          </button>
+        )}
+      </div>
+    </li>
   );
 };
 

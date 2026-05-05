@@ -24,7 +24,11 @@ export const DeadlinesButton = () => {
   const count = useMemo(() => {
     if (!currentUserId) return 0;
     return all.filter(entry => {
-      if (entry.deadline < nowSnapshot) return false;
+      // MOJO: badge counts only outstanding work — done deadlines drop
+      // out, snoozed/active ones stay until their effective date passes.
+      if (entry.done) return false;
+      const effective = DeadlineIndexService.effectiveDeadline(entry);
+      if (effective < nowSnapshot) return false;
       return (
         entry.createdBy === currentUserId ||
         entry.memberIds.includes(currentUserId)

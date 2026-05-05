@@ -14,7 +14,10 @@ import {
   AuthService,
   WorkspaceServerService,
 } from '@affine/core/modules/cloud';
-import { DeadlineIndexService } from '@affine/core/modules/deadline';
+import {
+  type DeadlineEntry,
+  DeadlineIndexService,
+} from '@affine/core/modules/deadline';
 import {
   type DocRecord,
   DocService,
@@ -333,8 +336,10 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
   const items = useMemo(() => {
     if (!currentUserId) return [];
     const filtered = all.filter(entry => {
-      if (entry.deadline < todayStart) return false;
-      const deadlineDayStart = new Date(entry.deadline);
+      if (entry.done) return false;
+      const effective = DeadlineIndexService.effectiveDeadline(entry);
+      if (effective < todayStart) return false;
+      const deadlineDayStart = new Date(effective);
       deadlineDayStart.setHours(0, 0, 0, 0);
       if (dayStart > deadlineDayStart.getTime()) return false;
       if (dayStart < todayStart) return false;
@@ -343,13 +348,17 @@ const JournalDeadlinesBlock = ({ date }: JournalBlockProps) => {
         entry.memberIds.includes(currentUserId)
       );
     });
-    return filtered.sort((a, b) => a.deadline - b.deadline);
+    return filtered.sort(
+      (a, b) =>
+        DeadlineIndexService.effectiveDeadline(a) -
+        DeadlineIndexService.effectiveDeadline(b)
+    );
   }, [all, todayStart, dayStart, currentUserId]);
 
   if (items.length === 0) return null;
 
-  const dateText = (entry: { deadline: number }) => {
-    const dl = dayjs(entry.deadline);
+  const dateText = (entry: DeadlineEntry) => {
+    const dl = dayjs(DeadlineIndexService.effectiveDeadline(entry));
     const diff = dl.startOf('day').diff(date.startOf('day'), 'day');
     if (diff === 0) return 'due today';
     if (diff === 1) return 'due tomorrow';

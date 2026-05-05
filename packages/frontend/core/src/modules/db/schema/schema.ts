@@ -94,6 +94,16 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     /** Last seen card title, cached so the list view can render it
      *  without opening the doc. */
     title: f.string().optional(),
+    /** MOJO: marks the deadline as completed. Set from the
+     *  /deadlines page; the kanban bridge upsert never writes this
+     *  field, so the flag survives subsequent kanban edits. */
+    done: f.boolean().optional(),
+    /** MOJO: timestamp the user pushed the deadline to. When set
+     *  and greater than `deadline`, the page treats this as the
+     *  effective due date (so "Snooze 3 days" hides the row from
+     *  Overdue without touching the kanban card). Cleared by the
+     *  user explicitly or when the kanban deadline catches up. */
+    snoozedUntil: f.number().optional(),
   },
   /**
    * MOJO: append-only activity log for kanban cards (rows). Surfaced in

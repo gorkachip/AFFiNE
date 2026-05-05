@@ -52,13 +52,12 @@ export const DeadlinesPage = () => {
     if (!currentUserId) return [];
     return all.filter(
       entry =>
-        entry.deadline >= nowSnapshot &&
-        (entry.createdBy === currentUserId ||
-          entry.memberIds.includes(currentUserId))
+        entry.createdBy === currentUserId ||
+        entry.memberIds.includes(currentUserId)
     );
-  }, [all, currentUserId, nowSnapshot]);
+  }, [all, currentUserId]);
 
-  const grouped = useMemo(() => {
+  const { grouped, doneEntries } = useMemo(() => {
     const todayStart = startOfDay(nowSnapshot);
     const buckets: Record<string, DeadlineEntry[]> = {
       Overdue: [],
@@ -67,14 +66,29 @@ export const DeadlinesPage = () => {
       'This week': [],
       Upcoming: [],
     };
+    const doneList: DeadlineEntry[] = [];
     for (const entry of visible) {
-      const key = bucketFor(entry.deadline, todayStart);
+      if (entry.done) {
+        doneList.push(entry);
+        continue;
+      }
+      const effective = DeadlineIndexService.effectiveDeadline(entry);
+      const key = bucketFor(effective, todayStart);
       buckets[key]?.push(entry);
     }
     for (const key of Object.keys(buckets)) {
-      buckets[key].sort((a, b) => a.deadline - b.deadline);
+      buckets[key].sort(
+        (a, b) =>
+          DeadlineIndexService.effectiveDeadline(a) -
+          DeadlineIndexService.effectiveDeadline(b)
+      );
     }
-    return buckets;
+    doneList.sort(
+      (a, b) =>
+        DeadlineIndexService.effectiveDeadline(b) -
+        DeadlineIndexService.effectiveDeadline(a)
+    );
+    return { grouped: buckets, doneEntries: doneList };
   }, [visible, nowSnapshot]);
 
   const handleOpen = useCallback(
@@ -85,6 +99,20 @@ export const DeadlinesPage = () => {
       );
     },
     [workbench]
+  );
+
+  const handleMarkDone = useCallback(
+    (entry: DeadlineEntry, done: boolean) => {
+      deadlineIndex.markDone(entry.id, done);
+    },
+    [deadlineIndex]
+  );
+
+  const handleSnooze = useCallback(
+    (entry: DeadlineEntry, days: number) => {
+      deadlineIndex.snoozeByDays(entry.id, days);
+    },
+    [deadlineIndex]
   );
 
   const isEmpty = visible.length === 0;
@@ -159,48 +187,68 @@ export const DeadlinesPage = () => {
                     }}
                   >
                     {items.map(entry => (
-                      <li
+                      <MobileDeadlineRow
                         key={entry.id}
-                        onClick={() => handleOpen(entry)}
-                        style={{
-                          padding: 12,
-                          borderRadius: 10,
-                          background: cssVarV2(
-                            'layer/background/mobile/secondary'
-                          ),
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4,
-                          cursor: 'pointer',
-                          WebkitTapHighlightColor: 'transparent',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 15,
-                            fontWeight: 500,
-                            color: cssVarV2('text/primary'),
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {entry.title || 'Untitled card'}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 13,
-                            color: cssVarV2('text/secondary'),
-                          }}
-                        >
-                          {new Date(entry.deadline).toLocaleDateString()}
-                        </span>
-                      </li>
+                        entry={entry}
+                        isOverdue={bucket === 'Overdue'}
+                        done={false}
+                        onOpen={handleOpen}
+                        onMarkDone={handleMarkDone}
+                        onSnooze={handleSnooze}
+                      />
                     ))}
                   </ul>
                 </section>
               );
             })
+          )}
+          {doneEntries.length > 0 && (
+            <section style={{ marginBottom: 24 }}>
+              <h3
+                style={{
+                  margin: '0 0 8px 0',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: cssVarV2('text/secondary'),
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'center',
+                }}
+              >
+                Done
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: cssVarV2('text/tertiary'),
+                  }}
+                >
+                  {doneEntries.length}
+                </span>
+              </h3>
+              <ul
+                style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                {doneEntries.map(entry => (
+                  <MobileDeadlineRow
+                    key={entry.id}
+                    entry={entry}
+                    isOverdue={false}
+                    done
+                    onOpen={handleOpen}
+                    onMarkDone={handleMarkDone}
+                    onSnooze={handleSnooze}
+                  />
+                ))}
+              </ul>
+            </section>
           )}
         </div>
       </div>
@@ -208,6 +256,136 @@ export const DeadlinesPage = () => {
         <AppTabs background={cssVarV2('layer/background/mobile/primary')} />
       </SafeArea>
     </>
+  );
+};
+
+interface MobileDeadlineRowProps {
+  entry: DeadlineEntry;
+  isOverdue: boolean;
+  done: boolean;
+  onOpen: (entry: DeadlineEntry) => void;
+  onMarkDone: (entry: DeadlineEntry, done: boolean) => void;
+  onSnooze: (entry: DeadlineEntry, days: number) => void;
+}
+
+const MobileDeadlineRow = ({
+  entry,
+  isOverdue,
+  done,
+  onOpen,
+  onMarkDone,
+  onSnooze,
+}: MobileDeadlineRowProps) => {
+  const effective = DeadlineIndexService.effectiveDeadline(entry);
+  const isSnoozed = entry.snoozedUntil != null && effective !== entry.deadline;
+
+  const stopThen = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    border: 'none',
+    background: cssVarV2('layer/background/hoverOverlay'),
+    color: cssVarV2('text/primary'),
+    fontSize: 12,
+    padding: '6px 10px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    flexShrink: 0,
+  };
+
+  return (
+    <li
+      onClick={() => onOpen(entry)}
+      style={{
+        padding: 12,
+        borderRadius: 10,
+        background: cssVarV2('layer/background/mobile/secondary'),
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        opacity: done ? 0.55 : 1,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 15,
+          fontWeight: 500,
+          color: cssVarV2('text/primary'),
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          textDecoration: done ? 'line-through' : undefined,
+        }}
+      >
+        {entry.title || 'Untitled card'}
+      </span>
+      <span
+        style={{
+          fontSize: 13,
+          color: isOverdue
+            ? cssVarV2('button/error')
+            : cssVarV2('text/secondary'),
+          fontWeight: isOverdue ? 600 : undefined,
+          fontStyle: isSnoozed ? 'italic' : undefined,
+        }}
+      >
+        {new Date(effective).toLocaleDateString()}
+        {isSnoozed ? ' (snoozed)' : ''}
+      </span>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {isOverdue && (
+          <>
+            <button
+              type="button"
+              onClick={stopThen(() => onSnooze(entry, 1))}
+              style={buttonStyle}
+            >
+              +1d
+            </button>
+            <button
+              type="button"
+              onClick={stopThen(() => onSnooze(entry, 3))}
+              style={buttonStyle}
+            >
+              +3d
+            </button>
+            <button
+              type="button"
+              onClick={stopThen(() => onSnooze(entry, 7))}
+              style={buttonStyle}
+            >
+              +1w
+            </button>
+          </>
+        )}
+        {!done && (
+          <button
+            type="button"
+            onClick={stopThen(() => onMarkDone(entry, true))}
+            style={{
+              ...buttonStyle,
+              color: cssVarV2('button/primary'),
+              fontWeight: 500,
+            }}
+          >
+            Mark done
+          </button>
+        )}
+        {done && (
+          <button
+            type="button"
+            onClick={stopThen(() => onMarkDone(entry, false))}
+            style={buttonStyle}
+          >
+            Reopen
+          </button>
+        )}
+      </div>
+    </li>
   );
 };
 
