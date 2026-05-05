@@ -134,9 +134,8 @@ export const actionButtonPrimary = style([
 
 export const rowDone = style({
   opacity: 0.55,
-  selectors: {
-    [`& .${cardTitle}`]: {
-      textDecoration: 'line-through',
-    },
-  },
+});
+
+export const cardTitleStrike = style({
+  textDecoration: 'line-through',
 });
