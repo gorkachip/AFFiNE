@@ -71,6 +71,7 @@ class AFFiNEViewController: CAPBridgeViewController, WKUIDelegate {
       AuthPlugin(),
       CookiePlugin(),
       HashcashPlugin(),
+      MojoOAuthPlugin(),
       NavigationGesturePlugin(),
       NbStorePlugin(),
       PayWallPlugin(associatedController: self),

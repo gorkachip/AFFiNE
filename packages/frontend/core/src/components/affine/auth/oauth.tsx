@@ -19,6 +19,8 @@ import {
   isCapacitor,
   MOJO_NATIVE_CLIENT,
   openInCapacitorBrowser,
+  parseCapacitorAuthUrl,
+  startCapacitorOAuthSession,
 } from './capacitor-oauth';
 
 const OAuthProviderMap: Record<
@@ -73,20 +75,49 @@ export function OAuth({ redirectUrl }: { redirectUrl?: string }) {
                   : (urlService.getClientScheme() ?? 'web');
                 const options = await auth.oauthPreflight(provider, scheme);
                 if (useCapacitorOAuth) {
-                  // Route through the native Browser plugin so the URL
-                  // never touches the WKWebView (Google would block it).
-                  // The callback returns to the app via the
-                  // `mojonotion://` scheme handled in the appUrlOpen
-                  // listener.
-                  const opened = await openInCapacitorBrowser(options.url);
-                  if (!opened) {
-                    urlService.openPopupWindow(options.url);
+                  // ASWebAuthenticationSession opens an in-app Safari
+                  // sheet that DOES capture the `mojonotion://` callback
+                  // (SFSafariViewController silently drops custom-scheme
+                  // navigations since iOS 14). Returns the callback URL
+                  // directly, no global listener needed.
+                  const callbackUrl = await startCapacitorOAuthSession(
+                    options.url
+                  );
+                  if (callbackUrl) {
+                    const parsed = parseCapacitorAuthUrl(callbackUrl);
+                    if (
+                      parsed?.method === 'oauth' &&
+                      parsed.payload.code &&
+                      parsed.payload.state
+                    ) {
+                      await auth.signInOauth(
+                        parsed.payload.code,
+                        parsed.payload.state,
+                        parsed.payload.provider ?? provider
+                      );
+                      // Reload so the app re-bootstraps as the
+                      // signed-in user (the cookie just landed on
+                      // the WebView).
+                      location.replace('/');
+                      return;
+                    }
+                  } else {
+                    // Native plugin missing — degrade to the
+                    // SFSafariViewController fallback so the user
+                    // still gets a popup of some kind. They'll
+                    // have to bounce through the legacy deep link.
+                    const opened = await openInCapacitorBrowser(options.url);
+                    if (!opened) {
+                      urlService.openPopupWindow(options.url);
+                    }
                   }
                 } else {
                   urlService.openPopupWindow(options.url);
                 }
               } catch (e) {
-                notify.error(UserFriendlyError.fromAny(e));
+                if ((e as { code?: string })?.code !== 'CANCELED') {
+                  notify.error(UserFriendlyError.fromAny(e));
+                }
               }
             }
           : () => {

@@ -21,6 +21,16 @@ interface CapacitorGlobal {
       ) => Promise<{ remove: () => Promise<void> }>;
       getLaunchUrl?: () => Promise<{ url?: string } | null>;
     };
+    // MOJO: native plugin (App/MojoOAuthPlugin.swift) wrapping
+    // ASWebAuthenticationSession so OAuth can return to the app
+    // through a custom URL scheme — SFSafariViewController silently
+    // drops `mojonotion://` since iOS 14 and breaks the callback.
+    MojoOAuth?: {
+      startAuthSession: (options: {
+        url: string;
+        callbackScheme: string;
+      }) => Promise<{ url: string }>;
+    };
   };
 }
 
@@ -42,6 +52,28 @@ export async function openInCapacitorBrowser(url: string): Promise<boolean> {
   }
   await browser.open({ url, presentationStyle: 'popover' });
   return true;
+}
+
+/**
+ * MOJO: starts an `ASWebAuthenticationSession` via the native plugin
+ * and resolves with the callback URL that closes it. SFSafariViewController
+ * (used by `@capacitor/browser`) blocks navigation to custom schemes
+ * since iOS 14, so the OAuth flow has to go through this instead.
+ *
+ * Returns `null` when the plugin isn't available (web bundle running
+ * outside the native shell), so callers can fall back to the legacy
+ * `Browser.open` path.
+ */
+export async function startCapacitorOAuthSession(
+  url: string
+): Promise<string | null> {
+  const plugin = getCapacitor()?.Plugins?.MojoOAuth;
+  if (!plugin) return null;
+  const result = await plugin.startAuthSession({
+    url,
+    callbackScheme: MOJO_NATIVE_CLIENT,
+  });
+  return result.url;
 }
 
 export async function closeCapacitorBrowser(): Promise<void> {
