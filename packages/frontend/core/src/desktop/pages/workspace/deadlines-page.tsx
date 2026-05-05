@@ -108,6 +108,14 @@ export const DeadlinesPage = () => {
 
   const handleOpen = useCallback(
     (entry: DeadlineEntry) => {
+      // MOJO: park the row id in a global so the kanban that mounts on
+      // the destination doc auto-opens its detail panel — otherwise the
+      // user lands on the kanban scroll and has to find the card.
+      (
+        globalThis as unknown as {
+          __mojoOpenKanbanCard?: { docId?: string; rowId?: string };
+        }
+      ).__mojoOpenKanbanCard = { docId: entry.docId, rowId: entry.rowId };
       workbench.openDoc(
         { docId: entry.docId, databaseRowId: entry.rowId },
         { at: 'active' }

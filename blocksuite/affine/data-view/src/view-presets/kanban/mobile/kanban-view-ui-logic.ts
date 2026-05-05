@@ -129,6 +129,31 @@ export class MobileKanbanViewUI extends DataViewUIBase<MobileKanbanViewUILogic> 
     super.connectedCallback();
     this.logic.ui$.value = this;
     this.classList.add(mobileKanbanViewWrapper);
+    this._mojoMaybeOpenPendingCard();
+  }
+
+  // MOJO: same auto-open hook as the PC kanban — when the deadlines
+  // page parks a `__mojoOpenKanbanCard` request before navigating, the
+  // first kanban that owns that row pops the detail panel so the user
+  // lands on the card itself instead of the kanban scroll.
+  private _mojoMaybeOpenPendingCard() {
+    const slot = globalThis as unknown as {
+      __mojoOpenKanbanCard?: { rowId?: string };
+    };
+    const pending = slot.__mojoOpenKanbanCard;
+    if (!pending?.rowId) return;
+    const view = this.logic.view;
+    const rowIds = view.dataSource.rows$.value;
+    if (!rowIds.includes(pending.rowId)) return;
+    const targetRowId = pending.rowId;
+    delete slot.__mojoOpenKanbanCard;
+    requestAnimationFrame(() => {
+      try {
+        this.logic.root.openDetailPanel({ view, rowId: targetRowId });
+      } catch (e) {
+        console.warn('[mojo deadline] auto-open card failed', e);
+      }
+    });
   }
 
   override render(): TemplateResult {
