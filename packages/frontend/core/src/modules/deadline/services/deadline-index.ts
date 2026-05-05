@@ -16,11 +16,6 @@ export interface DeadlineEntry {
   createdBy?: string;
   memberIds: string[];
   title: string;
-  done: boolean;
-  /** When > deadline, the page treats this as the effective due
-   *  date (snooze). Cleared when the kanban deadline catches up
-   *  past it on the next bridge upsert. */
-  snoozedUntil?: number;
 }
 
 /**
@@ -80,17 +75,8 @@ export class DeadlineIndexService extends Service {
             title: entry.title,
           });
         } catch (createErr) {
-          // Most likely a duplicate id — try update. Note: we
-          // intentionally do NOT pass `done` or `snoozedUntil`,
-          // so the user-set state survives subsequent kanban edits.
+          // Most likely a duplicate id — try update.
           try {
-            const existing = this.db.db.deadlines.get(id);
-            // If the kanban deadline has caught up past the snooze,
-            // the snooze becomes meaningless — clear it so the row
-            // doesn't stay parked in the future indefinitely.
-            const shouldClearSnooze =
-              existing?.snoozedUntil != null &&
-              entry.deadline >= existing.snoozedUntil;
             this.db.db.deadlines.update(id, {
               docId: entry.docId,
               rowId: entry.rowId,
@@ -98,7 +84,6 @@ export class DeadlineIndexService extends Service {
               createdBy: entry.createdBy,
               memberIds: JSON.stringify(entry.memberIds),
               title: entry.title,
-              ...(shouldClearSnooze ? { snoozedUntil: undefined } : {}),
             });
           } catch (updateErr) {
             console.warn('[mojo deadline] upsert failed', {
@@ -166,74 +151,11 @@ export class DeadlineIndexService extends Service {
           createdBy: row.createdBy ?? undefined,
           memberIds: row.memberIds ? safeParseArray(row.memberIds) : [],
           title: row.title ?? '',
-          done: !!row.done,
-          snoozedUntil:
-            row.snoozedUntil != null ? Number(row.snoozedUntil) : undefined,
         }));
       })
     ),
     []
   );
-
-  /**
-   * Effective deadline used for bucketing on the /deadlines page.
-   * Snooze pushes the row out of Overdue without touching the kanban.
-   */
-  static effectiveDeadline(entry: DeadlineEntry): number {
-    if (entry.snoozedUntil && entry.snoozedUntil > entry.deadline) {
-      return entry.snoozedUntil;
-    }
-    return entry.deadline;
-  }
-
-  markDone(id: string, done: boolean) {
-    try {
-      this.db.db.deadlines.update(id, { done });
-    } catch (e) {
-      console.warn('[mojo deadline] markDone failed', { id, done, error: e });
-    }
-  }
-
-  /** Push the deadline out by `days` days from the current effective date. */
-  snoozeByDays(id: string, days: number) {
-    try {
-      const row = this.db.db.deadlines.get(id);
-      if (!row?.deadline) return;
-      const current = Math.max(
-        Number(row.deadline),
-        Number(row.snoozedUntil ?? 0)
-      );
-      const snoozedUntil = current + days * 24 * 60 * 60 * 1000;
-      this.db.db.deadlines.update(id, { snoozedUntil });
-    } catch (e) {
-      console.warn('[mojo deadline] snoozeByDays failed', {
-        id,
-        days,
-        error: e,
-      });
-    }
-  }
-
-  /** Pin the snooze to a specific timestamp (used by a custom date picker). */
-  snoozeUntil(id: string, until: number) {
-    try {
-      this.db.db.deadlines.update(id, { snoozedUntil: until });
-    } catch (e) {
-      console.warn('[mojo deadline] snoozeUntil failed', {
-        id,
-        until,
-        error: e,
-      });
-    }
-  }
-
-  clearSnooze(id: string) {
-    try {
-      this.db.db.deadlines.update(id, { snoozedUntil: undefined });
-    } catch (e) {
-      console.warn('[mojo deadline] clearSnooze failed', { id, error: e });
-    }
-  }
 }
 
 function safeParseArray(raw: string): string[] {
