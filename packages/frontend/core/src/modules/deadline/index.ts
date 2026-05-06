@@ -12,5 +12,5 @@ export function configureDeadlineModule(framework: Framework) {
   framework
     .scope(WorkspaceScope)
     .service(DeadlineIndexService, [WorkspaceDBService, WorkspaceService])
-    .service(DeadlineUiStateService, [WorkspaceService]);
+    .service(DeadlineUiStateService, [WorkspaceDBService, WorkspaceService]);
 }
