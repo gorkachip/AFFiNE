@@ -133,7 +133,17 @@ export const DeadlinesPage = () => {
 
   const handleSnooze = useCallback(
     (entry: DeadlineEntry, days: number) => {
-      uiState.snoozeByDays(entry.id, days, effectiveDeadline(entry, states));
+      // MOJO: "extend" moves the kanban card's deadline cell forward so
+      // every member sees the new date. Falls back to local snooze if
+      // the card / database / deadline column can't be located.
+      const fallback = () =>
+        uiState.snoozeByDays(entry.id, days, effectiveDeadline(entry, states));
+      uiState
+        .extendCardDeadline(entry.id, days)
+        .then(applied => {
+          if (!applied) fallback();
+        })
+        .catch(() => fallback());
     },
     [uiState, states]
   );

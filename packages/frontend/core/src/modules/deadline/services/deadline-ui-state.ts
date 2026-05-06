@@ -2,6 +2,7 @@ import { LiveData, Service } from '@toeverything/infra';
 import { map } from 'rxjs';
 
 import { type WorkspaceDBService } from '../../db';
+import { type DocsService } from '../../doc';
 import { type WorkspaceService } from '../../workspace';
 
 function readMojoAuth(): { userId?: string; userName?: string } {
@@ -61,6 +62,21 @@ interface PerEntryState {
   snoozedUntil?: number;
 }
 
+// Loose type for the BlockSuite database model — we only need to
+// read columns/cells, not pull in @blocksuite types from another
+// package boundary.
+interface DatabaseLikeModel {
+  children?: { id: string }[];
+  props: {
+    // eslint-disable-next-line rxjs/finnish
+    columns$: { value: { id: string; type: string }[] };
+    cells: Record<
+      string,
+      Record<string, { columnId: string; value: unknown } | undefined>
+    >;
+  };
+}
+
 type StateMap = Record<string, PerEntryState>;
 
 const STORAGE_PREFIX = 'mojo:deadlines-ui-state:';
@@ -101,10 +117,105 @@ export class DeadlineUiStateService extends Service {
 
   constructor(
     private readonly db: WorkspaceDBService,
-    private readonly workspaceService: WorkspaceService
+    private readonly workspaceService: WorkspaceService,
+    private readonly docsService: DocsService
   ) {
     super();
     queueMicrotask(() => this.migrateLegacyLocalStorage());
+  }
+
+  /**
+   * Push the kanban card's actual deadline cell forward by `days`
+   * from today. Unlike snooze (which only flips the local UI state),
+   * this opens the doc, edits the deadline cell directly, and
+   * mirrors the change into the workspace deadlines index so other
+   * members see the new date too.
+   *
+   * Falls back gracefully when the doc / database / deadline column
+   * can't be located — the local snooze stays active so the user
+   * still gets the row out of Overdue.
+   */
+  async extendCardDeadline(entryId: string, days: number): Promise<boolean> {
+    const parts = parseEntryId(entryId);
+    if (!parts) return false;
+    const today = Date.now();
+    const newTimestamp = today + days * 24 * 60 * 60 * 1000;
+
+    let release: (() => void) | undefined;
+    let oldValue: number | undefined;
+    let success = false;
+    try {
+      const opened = this.docsService.open(parts.docId);
+      release = opened.release;
+      const doc = opened.doc;
+      const dispose = doc.addPriorityLoad(10);
+      await doc.waitForSyncReady();
+      dispose();
+
+      const bsDoc = doc.blockSuiteDoc;
+      const databaseModels = bsDoc
+        .getBlocksByFlavour('affine:database')
+        .map(block => block.model as unknown as DatabaseLikeModel)
+        .filter(Boolean);
+      const target = databaseModels.find(model =>
+        model.children?.some(child => child.id === parts.rowId)
+      );
+      if (!target) return false;
+      const cols = target.props?.columns$?.value ?? [];
+      const deadlineCol = cols.find(c => c.type === 'deadline');
+      if (!deadlineCol) return false;
+
+      bsDoc.transact(() => {
+        const cells = target.props.cells;
+        const existing = cells[parts.rowId]?.[deadlineCol.id];
+        if (typeof existing?.value === 'number') {
+          oldValue = existing.value;
+        }
+        if (!cells[parts.rowId]) {
+          cells[parts.rowId] = Object.create(null);
+        }
+        cells[parts.rowId][deadlineCol.id] = {
+          columnId: deadlineCol.id,
+          value: newTimestamp,
+        };
+      });
+      success = true;
+    } catch (e) {
+      console.warn('[mojo deadline] extendCardDeadline failed', {
+        entryId,
+        error: e,
+      });
+    } finally {
+      release?.();
+    }
+
+    if (success) {
+      // Mirror the change into the workspace deadlines index so the
+      // /deadlines list updates immediately — the data-source's own
+      // bridge upsert won't fire unless someone is rendering this
+      // doc's kanban right now.
+      try {
+        this.db.db.deadlines.update(entryId, { deadline: newTimestamp });
+      } catch {
+        // ignore — next bootstrap scan will create/sync the row
+      }
+      // Snooze becomes redundant once the underlying card has the
+      // new date; clear it so the row doesn't double-shift.
+      this.upsert(entryId, { snoozedUntil: undefined });
+      logToCardActivity({
+        docId: parts.docId,
+        rowId: parts.rowId,
+        action: `Extended deadline ${days}d`,
+        details: {
+          oldValue: oldValue
+            ? new Date(oldValue).toISOString().slice(0, 10)
+            : undefined,
+          newValue: new Date(newTimestamp).toISOString().slice(0, 10),
+          days,
+        },
+      });
+    }
+    return success;
   }
 
   isDone(id: string): boolean {
