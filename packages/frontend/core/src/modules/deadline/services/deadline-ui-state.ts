@@ -126,9 +126,15 @@ export class DeadlineUiStateService extends Service {
     }
   }
 
-  /** Push the deadline forward by `days` from the current effective date. */
-  snoozeByDays(id: string, days: number, currentEffective: number) {
-    const snoozedUntil = currentEffective + days * 24 * 60 * 60 * 1000;
+  /**
+   * Push the deadline forward by `days` from today (NOT from the
+   * existing date). Snooze buttons only appear on overdue entries, so
+   * the user's mental model is "+3 days from now" — extending past
+   * the already-overdue date would still leave it overdue.
+   */
+  snoozeByDays(id: string, days: number, currentEffective?: number) {
+    const today = Date.now();
+    const snoozedUntil = today + days * 24 * 60 * 60 * 1000;
     this.upsert(id, { snoozedUntil });
     const parts = parseEntryId(id);
     if (parts) {
@@ -136,7 +142,9 @@ export class DeadlineUiStateService extends Service {
         ...parts,
         action: `Snoozed deadline ${days}d`,
         details: {
-          oldValue: new Date(currentEffective).toISOString().slice(0, 10),
+          oldValue: currentEffective
+            ? new Date(currentEffective).toISOString().slice(0, 10)
+            : undefined,
           newValue: new Date(snoozedUntil).toISOString().slice(0, 10),
           days,
         },
