@@ -24,6 +24,7 @@ import {
 } from '../../../core/view/data-view-base.js';
 import type { KanbanSingleView } from '../kanban-view-manager.js';
 import type { KanbanViewSelectionWithType } from '../selection';
+import { popCardMenu } from './menu.js';
 
 const mobileKanbanViewWrapper = css({
   userSelect: 'none',
@@ -130,7 +131,40 @@ export class MobileKanbanViewUI extends DataViewUIBase<MobileKanbanViewUILogic> 
     this.logic.ui$.value = this;
     this.classList.add(mobileKanbanViewWrapper);
     this._mojoMaybeOpenPendingCard();
+    document.addEventListener(
+      'mojo-detail-card-menu',
+      this._mojoOnDetailCardMenu as EventListener
+    );
   }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener(
+      'mojo-detail-card-menu',
+      this._mojoOnDetailCardMenu as EventListener
+    );
+  }
+
+  // MOJO: same wiring as the PC kanban — the generic detail panel
+  // emits this when its "•••" is tapped; we open the existing
+  // mobile card menu so the expanded view has full parity with
+  // the small kanban card.
+  private readonly _mojoOnDetailCardMenu = (
+    event: CustomEvent<{ rowId?: string; anchor?: HTMLElement }>
+  ) => {
+    const detail = event.detail;
+    const rowId = detail?.rowId;
+    const anchor = detail?.anchor;
+    if (!rowId || !anchor) return;
+    const view = this.logic.view;
+    const rowIds = view.dataSource.rows$.value;
+    if (!rowIds.includes(rowId)) return;
+    const groupKey =
+      view.groupTrait.groupsDataList$.value?.find(g =>
+        g?.rows.some(r => r.rowId === rowId)
+      )?.key ?? '';
+    popCardMenu(popupTargetFromElement(anchor), groupKey, rowId, this.logic);
+  };
 
   // MOJO: same auto-open hook as the PC kanban — when the deadlines
   // page parks a `__mojoOpenKanbanCard` request before navigating, the

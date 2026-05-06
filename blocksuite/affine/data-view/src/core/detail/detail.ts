@@ -8,6 +8,7 @@ import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
 import {
   ArrowDownBigIcon,
   ArrowUpBigIcon,
+  MoreHorizontalIcon,
   PlusIcon,
 } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
@@ -215,6 +216,22 @@ export class RecordDetail extends SignalWatcher(
     this.requestUpdate();
   }
 
+  // MOJO: surface the same per-card menu (Activity, Move To, Delete,
+  // …) that the kanban renders behind a small "•••" button on the
+  // expanded card detail. The kanban view UI logic listens for this
+  // event and pops its own menu so we don't drag kanban-only code
+  // into the generic detail view.
+  private readonly _mojoOpenCardMenu = (e: MouseEvent) => {
+    e.stopPropagation();
+    const anchor = e.currentTarget as HTMLElement;
+    if (typeof document === 'undefined' || !document.dispatchEvent) return;
+    document.dispatchEvent(
+      new CustomEvent('mojo-detail-card-menu', {
+        detail: { rowId: this.rowId, anchor },
+      })
+    );
+  };
+
   override render() {
     const properties = this.properties$.value;
     const upClass = classMap({
@@ -235,6 +252,15 @@ export class RecordDetail extends SignalWatcher(
         <div @click="${this.nextRow}" class="${downClass}">
           ${ArrowDownBigIcon()}
         </div>
+        ${this.readonly
+          ? nothing
+          : html`<div
+              @click="${this._mojoOpenCardMenu}"
+              class="switch-row"
+              title="Card options"
+            >
+              ${MoreHorizontalIcon()}
+            </div>`}
       </div>
       <div style="flex:1;overflow-y: auto;overflow-x: hidden">
         <div

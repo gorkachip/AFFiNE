@@ -36,6 +36,7 @@ import { KanbanClipboardController } from './controller/clipboard.js';
 import { KanbanDragController } from './controller/drag.js';
 import { KanbanHotkeysController } from './controller/hotkeys.js';
 import { KanbanSelectionController } from './controller/selection.js';
+import { popCardMenu } from './menu.js';
 
 export class KanbanViewUILogic extends DataViewUILogicBase<
   KanbanSingleView,
@@ -228,7 +229,49 @@ export class KanbanViewUI extends DataViewUIBase<KanbanViewUILogic> {
     this.style.display = 'flex';
     this.style.flexDirection = 'column';
     this._mojoMaybeOpenPendingCard();
+    document.addEventListener(
+      'mojo-detail-card-menu',
+      this._mojoOnDetailCardMenu as EventListener
+    );
   }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener(
+      'mojo-detail-card-menu',
+      this._mojoOnDetailCardMenu as EventListener
+    );
+  }
+
+  // MOJO: the generic detail panel fires this event when the user
+  // taps the "•••" we added top-left. Reuse the kanban's existing
+  // popCardMenu so the expanded card has the same option list as the
+  // small card in the kanban itself.
+  private readonly _mojoOnDetailCardMenu = (
+    event: CustomEvent<{ rowId?: string; anchor?: HTMLElement }>
+  ) => {
+    const detail = event.detail;
+    const rowId = detail?.rowId;
+    const anchor = detail?.anchor;
+    if (!rowId || !anchor) return;
+    const view = this.logic.view;
+    const rowIds = view.dataSource.rows$.value;
+    if (!rowIds.includes(rowId)) return;
+    const groupKey =
+      view.groupTrait.groupsDataList$.value?.find(g =>
+        g?.rows.some(r => r.rowId === rowId)
+      )?.key ?? '';
+    this.logic.selectionController.selection = {
+      selectionType: 'card',
+      cards: [{ groupKey, cardId: rowId }],
+    };
+    popCardMenu(
+      this.logic,
+      popupTargetFromElement(anchor),
+      rowId,
+      this.logic.selectionController
+    );
+  };
 
   // MOJO: when /deadlines navigates here it sets a global pointing at
   // the row the user picked. Pop the card detail panel for it so the
