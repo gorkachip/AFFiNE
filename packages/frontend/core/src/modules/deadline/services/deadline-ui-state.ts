@@ -4,17 +4,56 @@ import { map } from 'rxjs';
 import { type WorkspaceDBService } from '../../db';
 import { type WorkspaceService } from '../../workspace';
 
-function readMojoAuthUserId(): string | undefined {
-  // The bridge is installed by `components/mojo-auth-bridge` whenever
-  // the React tree is mounted. Reading from the global keeps this
-  // service in WorkspaceScope (AuthService lives in ServerScope and
-  // can't be injected here without crossing scopes).
+function readMojoAuth(): { userId?: string; userName?: string } {
   const bridge = (
     globalThis as unknown as {
-      __mojoAuthContext?: { userId: string | null };
+      __mojoAuthContext?: { userId: string | null; userName?: string | null };
     }
   ).__mojoAuthContext;
-  return bridge?.userId ?? undefined;
+  return {
+    userId: bridge?.userId ?? undefined,
+    userName: bridge?.userName ?? undefined,
+  };
+}
+
+function logToCardActivity(entry: {
+  docId: string;
+  rowId: string;
+  action: string;
+  details?: Record<string, unknown>;
+}) {
+  const bridge = (
+    globalThis as unknown as {
+      __mojoCardActivityLog?: {
+        add: (e: {
+          rowId: string;
+          docId: string;
+          actorId?: string;
+          actorName?: string;
+          action: string;
+          details?: Record<string, unknown>;
+        }) => void;
+      };
+    }
+  ).__mojoCardActivityLog;
+  if (!bridge) return;
+  const { userId, userName } = readMojoAuth();
+  bridge.add({
+    rowId: entry.rowId,
+    docId: entry.docId,
+    actorId: userId,
+    actorName: userName,
+    action: entry.action,
+    details: entry.details,
+  });
+}
+
+function parseEntryId(id: string): { docId: string; rowId: string } | null {
+  // Composite key shape is `${docId}:${rowId}`; rowIds are nanoid
+  // (no colons) so the first segment is always the doc id.
+  const sep = id.indexOf(':');
+  if (sep <= 0) return null;
+  return { docId: id.slice(0, sep), rowId: id.slice(sep + 1) };
 }
 
 interface PerEntryState {
@@ -78,24 +117,60 @@ export class DeadlineUiStateService extends Service {
 
   markDone(id: string, done: boolean) {
     this.upsert(id, { done: done || undefined });
+    const parts = parseEntryId(id);
+    if (parts) {
+      logToCardActivity({
+        ...parts,
+        action: done ? 'Marked deadline done' : 'Reopened deadline',
+      });
+    }
   }
 
   /** Push the deadline forward by `days` from the current effective date. */
   snoozeByDays(id: string, days: number, currentEffective: number) {
     const snoozedUntil = currentEffective + days * 24 * 60 * 60 * 1000;
     this.upsert(id, { snoozedUntil });
+    const parts = parseEntryId(id);
+    if (parts) {
+      logToCardActivity({
+        ...parts,
+        action: `Snoozed deadline ${days}d`,
+        details: {
+          oldValue: new Date(currentEffective).toISOString().slice(0, 10),
+          newValue: new Date(snoozedUntil).toISOString().slice(0, 10),
+          days,
+        },
+      });
+    }
   }
 
   snoozeUntil(id: string, until: number) {
     this.upsert(id, { snoozedUntil: until });
+    const parts = parseEntryId(id);
+    if (parts) {
+      logToCardActivity({
+        ...parts,
+        action: 'Snoozed deadline',
+        details: {
+          newValue: new Date(until).toISOString().slice(0, 10),
+        },
+      });
+    }
   }
 
   clearSnooze(id: string) {
     this.upsert(id, { snoozedUntil: undefined });
+    const parts = parseEntryId(id);
+    if (parts) {
+      logToCardActivity({
+        ...parts,
+        action: 'Cleared deadline snooze',
+      });
+    }
   }
 
   private upsert(id: string, patch: PerEntryState) {
-    const userId = readMojoAuthUserId();
+    const userId = readMojoAuth().userId;
     const now = Date.now();
     const existing = this.db.db.deadlineState.get(id);
     const merged: PerEntryState = {
