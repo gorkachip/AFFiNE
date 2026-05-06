@@ -19,8 +19,19 @@ export const MojoAuthBridge = () => {
   const userId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
   );
+  // MOJO: prefer the display name, but fall back to email (or its
+  // local-part) so the activity log says "ari@mojo did X" instead of
+  // "Someone did X" for users that never set a profile name.
   const userName = useLiveData(
-    authService.session.account$.map(a => a?.label ?? null)
+    authService.session.account$.map(a => {
+      if (!a) return null;
+      const label = a.label?.trim();
+      if (label) return label;
+      const email = a.email?.trim();
+      if (!email) return null;
+      const at = email.indexOf('@');
+      return at > 0 ? email.slice(0, at) : email;
+    })
   );
   const isOwnerOrAdmin = useLiveData(
     permissionService.permission.isOwnerOrAdmin$
