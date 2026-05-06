@@ -170,24 +170,45 @@ export class MobileKanbanViewUI extends DataViewUIBase<MobileKanbanViewUILogic> 
   // page parks a `__mojoOpenKanbanCard` request before navigating, the
   // first kanban that owns that row pops the detail panel so the user
   // lands on the card itself instead of the kanban scroll.
+  //
+  // The data source's rows$ may still be empty when the kanban first
+  // mounts (the doc is hydrating), so subscribe and retry on each
+  // emit until the row appears or 8 seconds pass.
   private _mojoMaybeOpenPendingCard() {
     const slot = globalThis as unknown as {
       __mojoOpenKanbanCard?: { rowId?: string };
     };
     const pending = slot.__mojoOpenKanbanCard;
     if (!pending?.rowId) return;
-    const view = this.logic.view;
-    const rowIds = view.dataSource.rows$.value;
-    if (!rowIds.includes(pending.rowId)) return;
     const targetRowId = pending.rowId;
-    delete slot.__mojoOpenKanbanCard;
-    requestAnimationFrame(() => {
-      try {
-        this.logic.root.openDetailPanel({ view, rowId: targetRowId });
-      } catch (e) {
-        console.warn('[mojo deadline] auto-open card failed', e);
+    const view = this.logic.view;
+
+    let opened = false;
+    const tryOpen = () => {
+      if (opened) return true;
+      const rowIds = view.dataSource.rows$.value;
+      if (!rowIds.includes(targetRowId)) return false;
+      if (slot.__mojoOpenKanbanCard?.rowId !== targetRowId) {
+        opened = true;
+        return true;
       }
+      delete slot.__mojoOpenKanbanCard;
+      opened = true;
+      requestAnimationFrame(() => {
+        try {
+          this.logic.root.openDetailPanel({ view, rowId: targetRowId });
+        } catch (e) {
+          console.warn('[mojo deadline] auto-open card failed', e);
+        }
+      });
+      return true;
+    };
+
+    if (tryOpen()) return;
+    const subscription = view.dataSource.rows$.subscribe(() => {
+      if (tryOpen()) subscription.unsubscribe();
     });
+    setTimeout(() => subscription.unsubscribe(), 8000);
   }
 
   override render(): TemplateResult {
