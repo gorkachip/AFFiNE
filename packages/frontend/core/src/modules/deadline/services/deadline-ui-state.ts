@@ -173,39 +173,48 @@ export class DeadlineUiStateService extends Service {
     const userId = readMojoAuth().userId;
     const now = Date.now();
     const existing = this.db.db.deadlineState.get(id);
+    // Spread merges existing onto patch — but we need patch's
+    // `undefined` values to actually CLEAR the field, which `update()`
+    // refuses to do (the ORM validator strips undefined keys from the
+    // payload, leaving stale state behind). So compute the effective
+    // value field-by-field, then delete + create the row when the
+    // patch clears something.
     const merged: PerEntryState = {
-      done: existing?.done ?? undefined,
-      snoozedUntil: existing?.snoozedUntil ?? undefined,
-      ...patch,
+      done: 'done' in patch ? patch.done : (existing?.done ?? undefined),
+      snoozedUntil:
+        'snoozedUntil' in patch
+          ? patch.snoozedUntil
+          : existing?.snoozedUntil != null
+            ? Number(existing.snoozedUntil)
+            : undefined,
     };
     if (!merged.done && merged.snoozedUntil == null) {
-      // Nothing left to track — drop the row to keep the table tidy.
-      try {
-        this.db.db.deadlineState.delete(id);
-      } catch {
-        // ignore — row may not exist
+      if (existing) {
+        try {
+          this.db.db.deadlineState.delete(id);
+        } catch {
+          // ignore — row may already be gone
+        }
       }
       return;
     }
-    const payload = {
-      done: merged.done ?? undefined,
-      snoozedUntil: merged.snoozedUntil ?? undefined,
-      updatedBy: userId ?? undefined,
-      updatedAt: now,
-    };
+    // Recreate the row from scratch so cleared fields actually
+    // disappear from the underlying YMap.
     if (existing) {
       try {
-        this.db.db.deadlineState.update(id, payload);
-        return;
-      } catch (e) {
-        console.warn('[mojo deadline state] update failed, retrying create', {
-          id,
-          error: e,
-        });
+        this.db.db.deadlineState.delete(id);
+      } catch {
+        // ignore
       }
     }
     try {
-      this.db.db.deadlineState.create({ id, ...payload });
+      this.db.db.deadlineState.create({
+        id,
+        done: merged.done || undefined,
+        snoozedUntil: merged.snoozedUntil ?? undefined,
+        updatedBy: userId ?? undefined,
+        updatedAt: now,
+      });
     } catch (e) {
       console.warn('[mojo deadline state] create failed', { id, error: e });
     }
