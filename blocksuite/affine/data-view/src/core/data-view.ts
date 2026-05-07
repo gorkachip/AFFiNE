@@ -238,11 +238,7 @@ export class DataViewRootUI extends SignalWatcher(
     if (!view) return;
     if (!view.dataSource.rows$.value.includes(rowId)) return;
     requestAnimationFrame(() => {
-      try {
-        this.openDetailPanel({ view, rowId });
-      } catch (e) {
-        console.warn('[mojo deadline] auto-open card (event) failed', e);
-      }
+      mojoOpenDetailWithFlag(() => this.openDetailPanel({ view, rowId }));
     });
   };
 
@@ -267,11 +263,9 @@ export class DataViewRootUI extends SignalWatcher(
       delete slot.__mojoOpenKanbanCard;
       opened = true;
       requestAnimationFrame(() => {
-        try {
-          this.openDetailPanel({ view, rowId: targetRowId });
-        } catch (e) {
-          console.warn('[mojo deadline] auto-open card failed', e);
-        }
+        mojoOpenDetailWithFlag(() =>
+          this.openDetailPanel({ view, rowId: targetRowId })
+        );
       });
       return true;
     };
@@ -320,5 +314,26 @@ export class DataViewRootUI extends SignalWatcher(
 declare global {
   interface HTMLElementTagNameMap {
     'affine-data-view-renderer': DataViewRootUI;
+  }
+}
+
+// MOJO: when the user lands on a card via /deadlines, we want the
+// row's own detail panel even if the row title happens to be a
+// linked-doc reference. Flip the global before invoking
+// openDetailPanel and clear it on the next microtask so the normal
+// "click a kanban card" behaviour (which DOES prefer linked docs)
+// stays untouched.
+function mojoOpenDetailWithFlag(invoke: () => void) {
+  const slot = globalThis as { __mojoForceDetailPanel?: boolean };
+  const previous = slot.__mojoForceDetailPanel;
+  slot.__mojoForceDetailPanel = true;
+  try {
+    invoke();
+  } catch (e) {
+    console.warn('[mojo deadline] auto-open card failed', e);
+  } finally {
+    queueMicrotask(() => {
+      slot.__mojoForceDetailPanel = previous;
+    });
   }
 }

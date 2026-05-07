@@ -651,9 +651,19 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                   target: this,
                 });
               };
-              const doc = getSingleDocIdFromText(
-                this.model.store.getBlock(data.rowId)?.model?.text
-              );
+              // MOJO: when /deadlines (or any other in-app shortcut) sets
+              // this global, force the row's own detail panel instead of
+              // peeking the linked doc the row title points at — that's
+              // what was making `/deadlines` clicks appear to "just open
+              // the doc".
+              const forceDetail = !!(
+                globalThis as { __mojoForceDetailPanel?: boolean }
+              ).__mojoForceDetailPanel;
+              const doc = forceDetail
+                ? null
+                : getSingleDocIdFromText(
+                    this.model.store.getBlock(data.rowId)?.model?.text
+                  );
               if (doc) {
                 return openDoc(doc);
               }
