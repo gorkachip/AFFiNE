@@ -207,6 +207,94 @@ export class DataViewRootUI extends SignalWatcher(
   override connectedCallback() {
     super.connectedCallback();
     this.disposables.add(this.logic.setupViewChangeListener());
+    this._mojoMaybeOpenPendingCard();
+    document.addEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenCardEvent as EventListener
+    );
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenCardEvent as EventListener
+    );
+  }
+
+  // MOJO: when /deadlines navigates here it (a) parks a global the
+  // freshly-mounted data-view checks, AND (b) dispatches an event that
+  // already-mounted data-views catch. Either path looks up the row in
+  // the current view's data source and pops the detail panel so the
+  // user lands on the card body instead of an unfamiliar database
+  // scroll. Mounted at the data-view-renderer level so it works for
+  // every view variant (kanban / table / list / …).
+  private readonly _mojoOnOpenCardEvent = (
+    event: CustomEvent<{ rowId?: string }>
+  ) => {
+    const rowId = event.detail?.rowId;
+    if (!rowId) return;
+    const view = this.logic.currentView$.value;
+    if (!view) return;
+    if (!view.dataSource.rows$.value.includes(rowId)) return;
+    requestAnimationFrame(() => {
+      try {
+        this.openDetailPanel({ view, rowId });
+      } catch (e) {
+        console.warn('[mojo deadline] auto-open card (event) failed', e);
+      }
+    });
+  };
+
+  private _mojoMaybeOpenPendingCard() {
+    const slot = globalThis as unknown as {
+      __mojoOpenKanbanCard?: { rowId?: string };
+    };
+    const pending = slot.__mojoOpenKanbanCard;
+    if (!pending?.rowId) return;
+    const targetRowId = pending.rowId;
+
+    let opened = false;
+    const tryOpen = () => {
+      if (opened) return true;
+      const view = this.logic.currentView$.value;
+      if (!view) return false;
+      if (!view.dataSource.rows$.value.includes(targetRowId)) return false;
+      if (slot.__mojoOpenKanbanCard?.rowId !== targetRowId) {
+        opened = true;
+        return true;
+      }
+      delete slot.__mojoOpenKanbanCard;
+      opened = true;
+      requestAnimationFrame(() => {
+        try {
+          this.openDetailPanel({ view, rowId: targetRowId });
+        } catch (e) {
+          console.warn('[mojo deadline] auto-open card failed', e);
+        }
+      });
+      return true;
+    };
+
+    if (tryOpen()) return;
+    // Subscribe to currentView$ so we retry once the active view is
+    // wired up. For each view, also subscribe to its rows$ in case
+    // the data source hasn't hydrated yet.
+    const viewSub = this.logic.currentView$.subscribe(view => {
+      if (!view) return;
+      if (tryOpen()) {
+        viewSub.unsubscribe();
+        return;
+      }
+      const rowSub = view.dataSource.rows$.subscribe(() => {
+        if (tryOpen()) {
+          rowSub.unsubscribe();
+          viewSub.unsubscribe();
+        }
+      });
+      setTimeout(() => rowSub.unsubscribe(), 8000);
+    });
+    setTimeout(() => viewSub.unsubscribe(), 8000);
   }
 
   override render() {

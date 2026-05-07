@@ -228,14 +228,9 @@ export class KanbanViewUI extends DataViewUIBase<KanbanViewUILogic> {
     this.style.userSelect = 'none';
     this.style.display = 'flex';
     this.style.flexDirection = 'column';
-    this._mojoMaybeOpenPendingCard();
     document.addEventListener(
       'mojo-detail-card-menu',
       this._mojoOnDetailCardMenu as EventListener
-    );
-    document.addEventListener(
-      'mojo-open-kanban-card',
-      this._mojoOnOpenKanbanCardEvent as EventListener
     );
   }
 
@@ -245,31 +240,7 @@ export class KanbanViewUI extends DataViewUIBase<KanbanViewUILogic> {
       'mojo-detail-card-menu',
       this._mojoOnDetailCardMenu as EventListener
     );
-    document.removeEventListener(
-      'mojo-open-kanban-card',
-      this._mojoOnOpenKanbanCardEvent as EventListener
-    );
   }
-
-  // MOJO: handles the case where the doc was already open when the
-  // user clicked the deadline — connectedCallback doesn't run again,
-  // so the global-on-mount path misses the request. The deadlines
-  // page also dispatches this event for already-mounted kanbans.
-  private readonly _mojoOnOpenKanbanCardEvent = (
-    event: CustomEvent<{ rowId?: string }>
-  ) => {
-    const rowId = event.detail?.rowId;
-    if (!rowId) return;
-    const view = this.logic.view;
-    if (!view.dataSource.rows$.value.includes(rowId)) return;
-    requestAnimationFrame(() => {
-      try {
-        this.logic.root.openDetailPanel({ view, rowId });
-      } catch (e) {
-        console.warn('[mojo deadline] auto-open card (event) failed', e);
-      }
-    });
-  };
 
   // MOJO: the generic detail panel fires this event when the user
   // taps the "•••" we added top-left. Reuse the kanban's existing
@@ -300,53 +271,6 @@ export class KanbanViewUI extends DataViewUIBase<KanbanViewUILogic> {
       this.logic.selectionController
     );
   };
-
-  // MOJO: when /deadlines navigates here it sets a global pointing at
-  // the row the user picked. Pop the card detail panel for it so the
-  // user lands on the card body instead of an unfamiliar kanban view.
-  //
-  // The data source's rows$ may still be empty at connectedCallback
-  // time (the doc is hydrating), so subscribe and try on every emit
-  // until either the row appears or 8 seconds pass without it. The
-  // first kanban that actually owns the row consumes the global so
-  // sibling kanbans skip the work.
-  private _mojoMaybeOpenPendingCard() {
-    const slot = globalThis as unknown as {
-      __mojoOpenKanbanCard?: { rowId?: string };
-    };
-    const pending = slot.__mojoOpenKanbanCard;
-    if (!pending?.rowId) return;
-    const targetRowId = pending.rowId;
-    const view = this.logic.view;
-
-    let opened = false;
-    const tryOpen = () => {
-      if (opened) return true;
-      const rowIds = view.dataSource.rows$.value;
-      if (!rowIds.includes(targetRowId)) return false;
-      // Re-check the slot in case another kanban already grabbed it.
-      if (slot.__mojoOpenKanbanCard?.rowId !== targetRowId) {
-        opened = true;
-        return true;
-      }
-      delete slot.__mojoOpenKanbanCard;
-      opened = true;
-      requestAnimationFrame(() => {
-        try {
-          this.logic.root.openDetailPanel({ view, rowId: targetRowId });
-        } catch (e) {
-          console.warn('[mojo deadline] auto-open card failed', e);
-        }
-      });
-      return true;
-    };
-
-    if (tryOpen()) return;
-    const subscription = view.dataSource.rows$.subscribe(() => {
-      if (tryOpen()) subscription.unsubscribe();
-    });
-    setTimeout(() => subscription.unsubscribe(), 8000);
-  }
 
   override render(): TemplateResult {
     const groups = this.logic.groups$.value?.filter(
