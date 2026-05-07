@@ -1,5 +1,6 @@
 import {
   menu,
+  popFilterableSimpleMenu,
   popMenu,
   popupTargetFromElement,
 } from '@blocksuite/affine-components/context-menu';
@@ -8,6 +9,8 @@ import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
 import {
   ArrowDownBigIcon,
   ArrowUpBigIcon,
+  DateTimeIcon,
+  DeleteIcon,
   MoreHorizontalIcon,
   PlusIcon,
 } from '@blocksuite/icons/lit';
@@ -216,20 +219,44 @@ export class RecordDetail extends SignalWatcher(
     this.requestUpdate();
   }
 
-  // MOJO: surface the same per-card menu (Activity, Move To, Delete,
-  // …) that the kanban renders behind a small "•••" button on the
-  // expanded card detail. The kanban view UI logic listens for this
-  // event and pops its own menu so we don't drag kanban-only code
-  // into the generic detail view.
+  // MOJO: surface the most useful per-card actions behind a small
+  // "•••" button on the expanded detail. Kept generic (Activity +
+  // Delete) so the menu works regardless of which view rendered the
+  // detail — kanban-only items like "Move To" / "Insert Before"
+  // wouldn't make sense from the detail anyway.
   private readonly _mojoOpenCardMenu = (e: MouseEvent) => {
     e.stopPropagation();
     const anchor = e.currentTarget as HTMLElement;
-    if (typeof document === 'undefined' || !document.dispatchEvent) return;
-    document.dispatchEvent(
-      new CustomEvent('mojo-detail-card-menu', {
-        detail: { rowId: this.rowId, anchor },
-      })
-    );
+    const rowId = this.rowId;
+    const view = this.view;
+    popFilterableSimpleMenu(popupTargetFromElement(anchor), [
+      menu.action({
+        name: 'Activity',
+        prefix: DateTimeIcon(),
+        select: () => {
+          if (typeof document === 'undefined' || !document.dispatchEvent) {
+            return;
+          }
+          document.dispatchEvent(
+            new CustomEvent('mojo-card-activity', {
+              detail: { rowId },
+            })
+          );
+        },
+      }),
+      menu.action({
+        name: 'Delete card',
+        class: { 'delete-item': true },
+        prefix: DeleteIcon(),
+        select: () => {
+          try {
+            view.rowsDelete([rowId]);
+          } catch (err) {
+            console.warn('[mojo detail] delete failed', err);
+          }
+        },
+      }),
+    ]);
   };
 
   override render() {
