@@ -233,6 +233,30 @@ const MentionNotificationItem = ({
     notificationListService.readNotification(notification.id).catch(err => {
       console.error(err);
     });
+    // MOJO: if the mention was inside a kanban card body, the block
+    // id we get is some descendant of the row. Park it in a global
+    // so the database block can walk up the tree, find the row and
+    // pop the row's detail panel automatically.
+    if (body.doc.blockId) {
+      (
+        globalThis as unknown as {
+          __mojoOpenKanbanCardByBlockId?: { docId?: string; blockId?: string };
+        }
+      ).__mojoOpenKanbanCardByBlockId = {
+        docId: body.doc.id,
+        blockId: body.doc.blockId,
+      };
+      // Clear it after a short window so a stale request doesn't
+      // hijack a later (unrelated) navigation to the same doc.
+      setTimeout(() => {
+        const slot = globalThis as {
+          __mojoOpenKanbanCardByBlockId?: { blockId?: string };
+        };
+        if (slot.__mojoOpenKanbanCardByBlockId?.blockId === body.doc.blockId) {
+          delete slot.__mojoOpenKanbanCardByBlockId;
+        }
+      }, 10000);
+    }
     jumpToPageBlock(
       body.workspace.id,
       body.doc.id,

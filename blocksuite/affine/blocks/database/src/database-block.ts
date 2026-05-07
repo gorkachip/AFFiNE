@@ -590,29 +590,55 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     this.mojoTryOpenRowDetail(rowId);
   };
 
-  // MOJO: handle the request the deadlines page parked before
-  // navigating. The row may not be in this.model.children yet (the
-  // doc is still hydrating) so retry on every blockUpdated emit
+  // MOJO: handle the request the deadlines page (or any other
+  // shortcut that knows the row id directly) parked before
+  // navigating. The row may not be in this.model.children yet —
+  // doc is still hydrating — so retry on every blockUpdated emit
   // until the row appears or 8 seconds elapse.
   private _mojoMaybeOpenPending() {
     const slot = globalThis as unknown as {
       __mojoOpenKanbanCard?: { rowId?: string };
+      __mojoOpenKanbanCardByBlockId?: { blockId?: string };
     };
-    const pending = slot.__mojoOpenKanbanCard;
-    if (!pending?.rowId) return;
-    const targetRowId = pending.rowId;
 
-    const tryOpen = (): boolean => {
-      if (!this.model.children?.some(c => c.id === targetRowId)) return false;
-      if (slot.__mojoOpenKanbanCard?.rowId !== targetRowId) {
-        // Another database has already consumed it.
-        return true;
-      }
+    const tryRow = (): boolean => {
+      const pending = slot.__mojoOpenKanbanCard;
+      const rowId = pending?.rowId;
+      if (!rowId) return false;
+      if (!this.model.children?.some(c => c.id === rowId)) return false;
+      if (slot.__mojoOpenKanbanCard?.rowId !== rowId) return true;
       delete slot.__mojoOpenKanbanCard;
-      this.mojoTryOpenRowDetail(targetRowId);
+      this.mojoTryOpenRowDetail(rowId);
       return true;
     };
 
+    // Notifications point at a child block of the row (e.g. the
+    // comment block where the user was @-mentioned). Walk the tree
+    // upwards until we hit a direct child of this database — that's
+    // the row to open.
+    const tryByBlockId = (): boolean => {
+      const pending = slot.__mojoOpenKanbanCardByBlockId;
+      const blockId = pending?.blockId;
+      if (!blockId) return false;
+      const block = this.model.store.getBlock(blockId);
+      if (!block) return false;
+      let cur: { id: string; parent?: { id: string } | null } | null =
+        block.model;
+      while (cur && cur.id !== this.model.id) {
+        if (this.model.children?.some(c => c.id === cur!.id)) {
+          if (slot.__mojoOpenKanbanCardByBlockId?.blockId !== blockId) {
+            return true;
+          }
+          delete slot.__mojoOpenKanbanCardByBlockId;
+          this.mojoTryOpenRowDetail(cur.id);
+          return true;
+        }
+        cur = cur.parent ?? null;
+      }
+      return false;
+    };
+
+    const tryOpen = () => tryRow() || tryByBlockId();
     if (tryOpen()) return;
     const subscription = this.model.store.slots.blockUpdated.subscribe(() => {
       if (tryOpen()) subscription.unsubscribe();
