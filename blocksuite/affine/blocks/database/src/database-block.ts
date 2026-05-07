@@ -547,6 +547,96 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     this.classList.add(databaseBlockStyles);
     this.listenFullWidthChange();
     this.handleMobileEditing();
+    this._mojoRegisterRowDetailHandler();
+    this._mojoMaybeOpenPending();
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    const registry = (
+      globalThis as { __mojoRowDetailHandlers?: Set<DatabaseBlockComponent> }
+    ).__mojoRowDetailHandlers;
+    registry?.delete(this);
+    document.removeEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenCardEvent as EventListener
+    );
+  }
+
+  // MOJO: each database registers itself in a global set so the
+  // /deadlines page can iterate and ask "do you own this rowId?"
+  // without going through openDetailPanel — that path prefers linked
+  // docs over the row's own detail and was the cause of "click opens
+  // the doc, not the card".
+  private _mojoRegisterRowDetailHandler() {
+    const slot = globalThis as {
+      __mojoRowDetailHandlers?: Set<DatabaseBlockComponent>;
+    };
+    if (!slot.__mojoRowDetailHandlers) {
+      slot.__mojoRowDetailHandlers = new Set();
+    }
+    slot.__mojoRowDetailHandlers.add(this);
+    document.addEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenCardEvent as EventListener
+    );
+  }
+
+  private readonly _mojoOnOpenCardEvent = (
+    event: CustomEvent<{ rowId?: string }>
+  ) => {
+    const rowId = event.detail?.rowId;
+    if (!rowId) return;
+    this.mojoTryOpenRowDetail(rowId);
+  };
+
+  // MOJO: handle the request the deadlines page parked before
+  // navigating. The row may not be in this.model.children yet (the
+  // doc is still hydrating) so retry on every blockUpdated emit
+  // until the row appears or 8 seconds elapse.
+  private _mojoMaybeOpenPending() {
+    const slot = globalThis as unknown as {
+      __mojoOpenKanbanCard?: { rowId?: string };
+    };
+    const pending = slot.__mojoOpenKanbanCard;
+    if (!pending?.rowId) return;
+    const targetRowId = pending.rowId;
+
+    const tryOpen = (): boolean => {
+      if (!this.model.children?.some(c => c.id === targetRowId)) return false;
+      if (slot.__mojoOpenKanbanCard?.rowId !== targetRowId) {
+        // Another database has already consumed it.
+        return true;
+      }
+      delete slot.__mojoOpenKanbanCard;
+      this.mojoTryOpenRowDetail(targetRowId);
+      return true;
+    };
+
+    if (tryOpen()) return;
+    const subscription = this.model.store.slots.blockUpdated.subscribe(() => {
+      if (tryOpen()) subscription.unsubscribe();
+    });
+    setTimeout(() => subscription.unsubscribe(), 8000);
+  }
+
+  /** Open the row's own detail panel via popSideDetail, bypassing
+   *  the linked-doc preference baked into openDetailPanel. Returns
+   *  true when this database actually owns the row. */
+  mojoTryOpenRowDetail(rowId: string): boolean {
+    if (!this.model.children?.some(c => c.id === rowId)) return false;
+    const view = this.dataSource.value.viewManager.currentView$.value;
+    if (!view) return false;
+    requestAnimationFrame(() => {
+      popSideDetail(
+        this.createTemplate({ view, rowId }, () => {
+          // No-op: the side detail close button cleans up itself.
+        })
+      ).catch(e => {
+        console.warn('[mojo deadline] popSideDetail failed', e);
+      });
+    });
+    return true;
   }
 
   listenFullWidthChange() {
