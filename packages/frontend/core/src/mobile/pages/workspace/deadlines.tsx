@@ -101,9 +101,8 @@ export const DeadlinesPage = () => {
 
   const handleOpen = useCallback(
     (entry: DeadlineEntry) => {
-      // MOJO: tell the kanban that's about to mount which row to pop
-      // open as a detail panel, so the user doesn't land on a kanban
-      // scroll they have to hunt through.
+      // MOJO: cover both fresh-mount and already-mounted kanban —
+      // see the desktop deadlines page for the same dual signal.
       (
         globalThis as unknown as {
           __mojoOpenKanbanCard?: { docId?: string; rowId?: string };
@@ -113,6 +112,13 @@ export const DeadlinesPage = () => {
         { docId: entry.docId, databaseRowId: entry.rowId },
         { at: 'active' }
       );
+      requestAnimationFrame(() => {
+        document.dispatchEvent(
+          new CustomEvent('mojo-open-kanban-card', {
+            detail: { docId: entry.docId, rowId: entry.rowId },
+          })
+        );
+      });
     },
     [workbench]
   );

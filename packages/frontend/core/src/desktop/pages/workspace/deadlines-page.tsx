@@ -108,9 +108,11 @@ export const DeadlinesPage = () => {
 
   const handleOpen = useCallback(
     (entry: DeadlineEntry) => {
-      // MOJO: park the row id in a global so the kanban that mounts on
-      // the destination doc auto-opens its detail panel — otherwise the
-      // user lands on the kanban scroll and has to find the card.
+      // MOJO: cover both cases for auto-opening the card detail:
+      //   1. fresh mount — set a global the kanban checks in
+      //      connectedCallback (handles cold-loaded docs)
+      //   2. already-mounted kanban — dispatch an event the kanban
+      //      listens to (handles "this doc was already open")
       (
         globalThis as unknown as {
           __mojoOpenKanbanCard?: { docId?: string; rowId?: string };
@@ -120,6 +122,15 @@ export const DeadlinesPage = () => {
         { docId: entry.docId, databaseRowId: entry.rowId },
         { at: 'active' }
       );
+      // Fire the event after the navigation kicks in so a kanban
+      // that was already mounted picks it up.
+      requestAnimationFrame(() => {
+        document.dispatchEvent(
+          new CustomEvent('mojo-open-kanban-card', {
+            detail: { docId: entry.docId, rowId: entry.rowId },
+          })
+        );
+      });
     },
     [workbench]
   );

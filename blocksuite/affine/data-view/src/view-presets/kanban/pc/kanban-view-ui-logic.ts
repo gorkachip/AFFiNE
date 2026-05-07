@@ -233,6 +233,10 @@ export class KanbanViewUI extends DataViewUIBase<KanbanViewUILogic> {
       'mojo-detail-card-menu',
       this._mojoOnDetailCardMenu as EventListener
     );
+    document.addEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenKanbanCardEvent as EventListener
+    );
   }
 
   override disconnectedCallback(): void {
@@ -241,7 +245,31 @@ export class KanbanViewUI extends DataViewUIBase<KanbanViewUILogic> {
       'mojo-detail-card-menu',
       this._mojoOnDetailCardMenu as EventListener
     );
+    document.removeEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenKanbanCardEvent as EventListener
+    );
   }
+
+  // MOJO: handles the case where the doc was already open when the
+  // user clicked the deadline — connectedCallback doesn't run again,
+  // so the global-on-mount path misses the request. The deadlines
+  // page also dispatches this event for already-mounted kanbans.
+  private readonly _mojoOnOpenKanbanCardEvent = (
+    event: CustomEvent<{ rowId?: string }>
+  ) => {
+    const rowId = event.detail?.rowId;
+    if (!rowId) return;
+    const view = this.logic.view;
+    if (!view.dataSource.rows$.value.includes(rowId)) return;
+    requestAnimationFrame(() => {
+      try {
+        this.logic.root.openDetailPanel({ view, rowId });
+      } catch (e) {
+        console.warn('[mojo deadline] auto-open card (event) failed', e);
+      }
+    });
+  };
 
   // MOJO: the generic detail panel fires this event when the user
   // taps the "•••" we added top-left. Reuse the kanban's existing

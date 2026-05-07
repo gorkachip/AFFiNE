@@ -135,6 +135,10 @@ export class MobileKanbanViewUI extends DataViewUIBase<MobileKanbanViewUILogic> 
       'mojo-detail-card-menu',
       this._mojoOnDetailCardMenu as EventListener
     );
+    document.addEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenKanbanCardEvent as EventListener
+    );
   }
 
   override disconnectedCallback(): void {
@@ -143,7 +147,31 @@ export class MobileKanbanViewUI extends DataViewUIBase<MobileKanbanViewUILogic> 
       'mojo-detail-card-menu',
       this._mojoOnDetailCardMenu as EventListener
     );
+    document.removeEventListener(
+      'mojo-open-kanban-card',
+      this._mojoOnOpenKanbanCardEvent as EventListener
+    );
   }
+
+  // MOJO: covers the case where the doc was already open before the
+  // user clicked a deadline — the kanban doesn't remount so the
+  // global-on-mount check never fires. Listening for the explicit
+  // event always lets us pop the detail.
+  private readonly _mojoOnOpenKanbanCardEvent = (
+    event: CustomEvent<{ rowId?: string }>
+  ) => {
+    const rowId = event.detail?.rowId;
+    if (!rowId) return;
+    const view = this.logic.view;
+    if (!view.dataSource.rows$.value.includes(rowId)) return;
+    requestAnimationFrame(() => {
+      try {
+        this.logic.root.openDetailPanel({ view, rowId });
+      } catch (e) {
+        console.warn('[mojo deadline] auto-open card (event) failed', e);
+      }
+    });
+  };
 
   // MOJO: same wiring as the PC kanban — the generic detail panel
   // emits this when its "•••" is tapped; we open the existing
