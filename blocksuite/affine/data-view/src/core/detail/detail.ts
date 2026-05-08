@@ -1,6 +1,5 @@
 import {
   menu,
-  popFilterableSimpleMenu,
   popMenu,
   popupTargetFromElement,
 } from '@blocksuite/affine-components/context-menu';
@@ -11,7 +10,6 @@ import {
   ArrowUpBigIcon,
   DateTimeIcon,
   DeleteIcon,
-  MoreHorizontalIcon,
   PlusIcon,
 } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
@@ -219,44 +217,28 @@ export class RecordDetail extends SignalWatcher(
     this.requestUpdate();
   }
 
-  // MOJO: surface the most useful per-card actions behind a small
-  // "•••" button on the expanded detail. Kept generic (Activity +
-  // Delete) so the menu works regardless of which view rendered the
-  // detail — kanban-only items like "Move To" / "Insert Before"
-  // wouldn't make sense from the detail anyway.
-  private readonly _mojoOpenCardMenu = (e: MouseEvent) => {
+  // MOJO: per-card actions surfaced as inline buttons next to the
+  // up/down arrows on the detail header. We tried a popup menu first
+  // but popSideDetail's modal sits at z-index 1001 and the
+  // context-menu uses z-index 999 — the menu rendered behind the
+  // modal and clicks didn't reach it. Inline buttons sidestep that.
+  private readonly _mojoOnActivity = (e: MouseEvent) => {
     e.stopPropagation();
-    const anchor = e.currentTarget as HTMLElement;
-    const rowId = this.rowId;
-    const view = this.view;
-    popFilterableSimpleMenu(popupTargetFromElement(anchor), [
-      menu.action({
-        name: 'Activity',
-        prefix: DateTimeIcon(),
-        select: () => {
-          if (typeof document === 'undefined' || !document.dispatchEvent) {
-            return;
-          }
-          document.dispatchEvent(
-            new CustomEvent('mojo-card-activity', {
-              detail: { rowId },
-            })
-          );
-        },
-      }),
-      menu.action({
-        name: 'Delete card',
-        class: { 'delete-item': true },
-        prefix: DeleteIcon(),
-        select: () => {
-          try {
-            view.rowsDelete([rowId]);
-          } catch (err) {
-            console.warn('[mojo detail] delete failed', err);
-          }
-        },
-      }),
-    ]);
+    if (typeof document === 'undefined' || !document.dispatchEvent) return;
+    document.dispatchEvent(
+      new CustomEvent('mojo-card-activity', {
+        detail: { rowId: this.rowId },
+      })
+    );
+  };
+
+  private readonly _mojoOnDeleteCard = (e: MouseEvent) => {
+    e.stopPropagation();
+    try {
+      this.view.rowsDelete([this.rowId]);
+    } catch (err) {
+      console.warn('[mojo detail] delete failed', err);
+    }
   };
 
   override render() {
@@ -282,12 +264,20 @@ export class RecordDetail extends SignalWatcher(
         ${this.readonly
           ? nothing
           : html`<div
-              @click="${this._mojoOpenCardMenu}"
-              class="switch-row"
-              title="Card options"
-            >
-              ${MoreHorizontalIcon()}
-            </div>`}
+                @click="${this._mojoOnActivity}"
+                class="switch-row"
+                title="Activity log"
+              >
+                ${DateTimeIcon()}
+              </div>
+              <div
+                @click="${this._mojoOnDeleteCard}"
+                class="switch-row"
+                title="Delete card"
+                style="color: var(--affine-error-color)"
+              >
+                ${DeleteIcon()}
+              </div>`}
       </div>
       <div style="flex:1;overflow-y: auto;overflow-x: hidden">
         <div
