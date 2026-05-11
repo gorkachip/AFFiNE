@@ -645,35 +645,53 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       });
     };
 
-    // Comment-mention notifications carry only a commentId. Find any
-    // block in this doc whose text has the matching `comment-${id}`
-    // attribute, then walk up to its database row.
+    // Comment-mention notifications carry only a commentId. AFFiNE
+    // attaches comments to blocks two ways depending on what was
+    // selected when the comment was made:
+    //   1. inline text — the commentId is encoded as a
+    //      `comment-${id}` attribute in the block's text delta.
+    //   2. block-level — the commentId lives in
+    //      `block.props.comments` (a map keyed by commentId).
+    // Scan for both, then walk up from any matching block to its
+    // database row.
     const tryByCommentId = (): boolean => {
       const pending = slot.__mojoOpenKanbanCardByCommentId;
       const commentId = pending?.commentId;
       if (!commentId) return false;
       const target = `comment-${commentId}`;
       const models = this.model.store.getAllModels?.() ?? [];
+      const consumeFlag = () => {
+        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
+          delete slot.__mojoOpenKanbanCardByCommentId;
+        }
+      };
       for (const model of models) {
-        if (!model.text) continue;
         let hasComment = false;
-        try {
-          model.text.toDelta().forEach(d => {
-            if (d?.attributes && target in d.attributes) {
-              hasComment = true;
-            }
-          });
-        } catch {
-          // ignore decode failures
+        // (1) inline-text comment
+        if (model.text) {
+          try {
+            model.text.toDelta().forEach(d => {
+              if (d?.attributes && target in d.attributes) {
+                hasComment = true;
+              }
+            });
+          } catch {
+            // ignore decode failures
+          }
+        }
+        // (2) block-level comment — props.comments is a map keyed
+        // by commentId. We don't care about the value's shape, only
+        // whether the key is present.
+        if (!hasComment) {
+          const blockComments = (
+            model as { props?: { comments?: Record<string, unknown> } }
+          ).props?.comments;
+          if (blockComments && commentId in blockComments) {
+            hasComment = true;
+          }
         }
         if (!hasComment) continue;
-        if (
-          openRowAncestor(model.id, () => {
-            if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
-              delete slot.__mojoOpenKanbanCardByCommentId;
-            }
-          })
-        ) {
+        if (openRowAncestor(model.id, consumeFlag)) {
           return true;
         }
       }
