@@ -233,10 +233,14 @@ const MentionNotificationItem = ({
     notificationListService.readNotification(notification.id).catch(err => {
       console.error(err);
     });
-    // MOJO: if the mention was inside a kanban card body, the block
-    // id we get is some descendant of the row. Park it in a global
-    // so the database block can walk up the tree, find the row and
-    // pop the row's detail panel automatically.
+    // MOJO: park context for the database block to auto-open the
+    // row's detail panel after navigation. Two paths:
+    //  - blockId is set (regular @-mention with explicit block) →
+    //    walk up from the block to find the row.
+    //  - commentId is set (mention inside a comment) → block isn't
+    //    in the body, so the database block scans the doc for the
+    //    `comment-${id}` text attribute and walks up from there.
+    const commentId = (body as unknown as { commentId?: string }).commentId;
     if (body.doc.blockId) {
       (
         globalThis as unknown as {
@@ -246,14 +250,33 @@ const MentionNotificationItem = ({
         docId: body.doc.id,
         blockId: body.doc.blockId,
       };
-      // Clear it after a short window so a stale request doesn't
-      // hijack a later (unrelated) navigation to the same doc.
       setTimeout(() => {
         const slot = globalThis as {
           __mojoOpenKanbanCardByBlockId?: { blockId?: string };
         };
         if (slot.__mojoOpenKanbanCardByBlockId?.blockId === body.doc.blockId) {
           delete slot.__mojoOpenKanbanCardByBlockId;
+        }
+      }, 10000);
+    }
+    if (commentId) {
+      (
+        globalThis as unknown as {
+          __mojoOpenKanbanCardByCommentId?: {
+            docId?: string;
+            commentId?: string;
+          };
+        }
+      ).__mojoOpenKanbanCardByCommentId = {
+        docId: body.doc.id,
+        commentId,
+      };
+      setTimeout(() => {
+        const slot = globalThis as {
+          __mojoOpenKanbanCardByCommentId?: { commentId?: string };
+        };
+        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
+          delete slot.__mojoOpenKanbanCardByCommentId;
         }
       }, 10000);
     }

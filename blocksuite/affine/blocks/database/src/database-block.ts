@@ -599,6 +599,26 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     const slot = globalThis as unknown as {
       __mojoOpenKanbanCard?: { rowId?: string };
       __mojoOpenKanbanCardByBlockId?: { blockId?: string };
+      __mojoOpenKanbanCardByCommentId?: { commentId?: string };
+    };
+
+    const openRowAncestor = (
+      blockId: string,
+      consumedFlag: () => void
+    ): boolean => {
+      const block = this.model.store.getBlock(blockId);
+      if (!block) return false;
+      let cur: { id: string; parent?: { id: string } | null } | null =
+        block.model;
+      while (cur && cur.id !== this.model.id) {
+        if (this.model.children?.some(c => c.id === cur!.id)) {
+          consumedFlag();
+          this.mojoTryOpenRowDetail(cur.id);
+          return true;
+        }
+        cur = cur.parent ?? null;
+      }
+      return false;
     };
 
     const tryRow = (): boolean => {
@@ -612,33 +632,55 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       return true;
     };
 
-    // Notifications point at a child block of the row (e.g. the
-    // comment block where the user was @-mentioned). Walk the tree
-    // upwards until we hit a direct child of this database — that's
-    // the row to open.
+    // Notifications with a known blockId (e.g. an @-mention typed
+    // directly inside a doc body) — walk up to find the row.
     const tryByBlockId = (): boolean => {
       const pending = slot.__mojoOpenKanbanCardByBlockId;
       const blockId = pending?.blockId;
       if (!blockId) return false;
-      const block = this.model.store.getBlock(blockId);
-      if (!block) return false;
-      let cur: { id: string; parent?: { id: string } | null } | null =
-        block.model;
-      while (cur && cur.id !== this.model.id) {
-        if (this.model.children?.some(c => c.id === cur!.id)) {
-          if (slot.__mojoOpenKanbanCardByBlockId?.blockId !== blockId) {
-            return true;
-          }
+      return openRowAncestor(blockId, () => {
+        if (slot.__mojoOpenKanbanCardByBlockId?.blockId === blockId) {
           delete slot.__mojoOpenKanbanCardByBlockId;
-          this.mojoTryOpenRowDetail(cur.id);
+        }
+      });
+    };
+
+    // Comment-mention notifications carry only a commentId. Find any
+    // block in this doc whose text has the matching `comment-${id}`
+    // attribute, then walk up to its database row.
+    const tryByCommentId = (): boolean => {
+      const pending = slot.__mojoOpenKanbanCardByCommentId;
+      const commentId = pending?.commentId;
+      if (!commentId) return false;
+      const target = `comment-${commentId}`;
+      const models = this.model.store.getAllModels?.() ?? [];
+      for (const model of models) {
+        if (!model.text) continue;
+        let hasComment = false;
+        try {
+          model.text.toDelta().forEach(d => {
+            if (d?.attributes && target in d.attributes) {
+              hasComment = true;
+            }
+          });
+        } catch {
+          // ignore decode failures
+        }
+        if (!hasComment) continue;
+        if (
+          openRowAncestor(model.id, () => {
+            if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
+              delete slot.__mojoOpenKanbanCardByCommentId;
+            }
+          })
+        ) {
           return true;
         }
-        cur = cur.parent ?? null;
       }
       return false;
     };
 
-    const tryOpen = () => tryRow() || tryByBlockId();
+    const tryOpen = () => tryRow() || tryByBlockId() || tryByCommentId();
     if (tryOpen()) return;
     const subscription = this.model.store.slots.blockUpdated.subscribe(() => {
       if (tryOpen()) subscription.unsubscribe();
