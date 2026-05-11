@@ -875,6 +875,32 @@ const CommentNotificationItem = ({
       console.error(err);
     });
 
+    // MOJO: if the comment is on a kanban card, park a request so
+    // the database block can find the row by its `comment-${id}`
+    // text attribute and pop the row detail after navigation.
+    if (body.commentId) {
+      const commentId = body.commentId;
+      (
+        globalThis as unknown as {
+          __mojoOpenKanbanCardByCommentId?: {
+            docId?: string;
+            commentId?: string;
+          };
+        }
+      ).__mojoOpenKanbanCardByCommentId = {
+        docId: body.doc.id,
+        commentId,
+      };
+      setTimeout(() => {
+        const slot = globalThis as {
+          __mojoOpenKanbanCardByCommentId?: { commentId?: string };
+        };
+        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
+          delete slot.__mojoOpenKanbanCardByCommentId;
+        }
+      }, 10000);
+    }
+
     jumpToPageComment(
       body.workspaceId,
       body.doc.id,
@@ -944,6 +970,32 @@ const CommentMentionNotificationItem = ({
     notificationListService.readNotification(notification.id).catch(err => {
       console.error(err);
     });
+
+    // MOJO: if the comment is on a kanban card, park a request so
+    // the database block can find the row by its `comment-${id}`
+    // text attribute and pop the row detail after navigation.
+    if (body.commentId) {
+      const commentId = body.commentId;
+      (
+        globalThis as unknown as {
+          __mojoOpenKanbanCardByCommentId?: {
+            docId?: string;
+            commentId?: string;
+          };
+        }
+      ).__mojoOpenKanbanCardByCommentId = {
+        docId: body.doc.id,
+        commentId,
+      };
+      setTimeout(() => {
+        const slot = globalThis as {
+          __mojoOpenKanbanCardByCommentId?: { commentId?: string };
+        };
+        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
+          delete slot.__mojoOpenKanbanCardByCommentId;
+        }
+      }, 10000);
+    }
 
     jumpToPageComment(
       body.workspaceId,
