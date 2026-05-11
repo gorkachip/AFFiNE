@@ -600,23 +600,19 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
 
   // MOJO: covers the "doc was already open when the user clicked a
   // notification" case — the database block is already mounted, so
-  // the global-on-mount check never re-runs. Walk up from blockId
-  // to find the row owned by this database and pop its detail.
+  // the global-on-mount check never re-runs. Only act when blockId
+  // IS a row directly (activity-log mentions stamp rowId as
+  // blockId). For @-mentions typed in doc body or in comment
+  // threads, blockId is a sub-block — popping the card would cover
+  // the thread sidebar / doc location the user actually wants to
+  // see, so leave navigation to the standard jumpToPageBlock.
   private readonly _mojoOnOpenCardByBlockEvent = (
     event: CustomEvent<{ blockId?: string }>
   ) => {
     const blockId = event.detail?.blockId;
     if (!blockId) return;
-    const block = this.model.store.getBlock(blockId);
-    if (!block) return;
-    let cur: { id: string; parent?: { id: string } | null } | null =
-      block.model;
-    while (cur && cur.id !== this.model.id) {
-      if (this.model.children?.some(c => c.id === cur!.id)) {
-        this.mojoTryOpenRowDetail(cur.id);
-        return;
-      }
-      cur = cur.parent ?? null;
+    if (this.model.children?.some(c => c.id === blockId)) {
+      this.mojoTryOpenRowDetail(blockId);
     }
   };
 
@@ -662,17 +658,20 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       return true;
     };
 
-    // Notifications with a known blockId (e.g. an @-mention typed
-    // directly inside a doc body) — walk up to find the row.
+    // Notifications with a known blockId. Only act when the
+    // blockId IS a row directly (activity-log mentions stamp rowId
+    // as blockId). For @-mentions inside doc body or comment
+    // threads, blockId is a sub-block — popping the card would
+    // hide the location/thread the user came to read.
     const tryByBlockId = (): boolean => {
       const pending = slot.__mojoOpenKanbanCardByBlockId;
       const blockId = pending?.blockId;
       if (!blockId) return false;
-      return openRowAncestor(blockId, () => {
-        if (slot.__mojoOpenKanbanCardByBlockId?.blockId === blockId) {
-          delete slot.__mojoOpenKanbanCardByBlockId;
-        }
-      });
+      if (!this.model.children?.some(c => c.id === blockId)) return false;
+      if (slot.__mojoOpenKanbanCardByBlockId?.blockId !== blockId) return true;
+      delete slot.__mojoOpenKanbanCardByBlockId;
+      this.mojoTryOpenRowDetail(blockId);
+      return true;
     };
 
     // Comment-mention notifications carry only a commentId. AFFiNE
