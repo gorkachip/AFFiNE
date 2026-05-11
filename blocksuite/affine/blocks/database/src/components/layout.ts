@@ -53,17 +53,58 @@ export class CenterPeek extends ShadowlessElement {
   accessor content: TemplateResult | undefined = undefined;
 }
 
+// MOJO: the upstream popSideDetail covers the entire viewport, so
+// the right sidebar (where comment threads live) ends up buried
+// behind the modal backdrop. We measure the right sidebar at open
+// time and shrink both the backdrop and the peek so the sidebar
+// stays visible and clickable. The observer keeps the layout in
+// sync if the user opens / closes / resizes the sidebar while
+// the card is open.
+const findRightSidebar = (): HTMLElement | null => {
+  const panels = document.querySelectorAll<HTMLElement>(
+    '[class*="workbenchSidebar"]'
+  );
+  for (const panel of Array.from(panels)) {
+    if (panel.offsetWidth > 0) return panel;
+  }
+  return null;
+};
+
+const measureRightReservedPx = (): number => {
+  const panel = findRightSidebar();
+  if (!panel) return 0;
+  const rect = panel.getBoundingClientRect();
+  return Math.max(0, window.innerWidth - rect.left);
+};
+
 export const popSideDetail = (template: TemplateResult) => {
   return new Promise<void>(res => {
     const modal = createModal(document.body);
+    const sideContainer = new CenterPeek();
+    sideContainer.content = template;
+
+    let lastReserved = -1;
+    const applyLayout = () => {
+      const reserved = measureRightReservedPx();
+      if (reserved === lastReserved) return;
+      lastReserved = reserved;
+      modal.style.width = reserved > 0 ? `calc(100% - ${reserved}px)` : '100%';
+      sideContainer.style.right = reserved > 0 ? `${reserved + 24}px` : '5%';
+      sideContainer.style.left = '5%';
+      sideContainer.style.width = 'auto';
+    };
+    const intervalId = window.setInterval(applyLayout, 250);
+
     const close = () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('resize', applyLayout);
       modal.remove();
       res();
     };
-    const sideContainer = new CenterPeek();
-    sideContainer.content = template;
     sideContainer.close = close;
     modal.onclick = e => e.target === modal && close();
     modal.append(sideContainer);
+    applyLayout();
+    window.addEventListener('resize', applyLayout);
   });
 };
