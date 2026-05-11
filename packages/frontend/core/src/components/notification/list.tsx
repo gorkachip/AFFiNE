@@ -238,14 +238,13 @@ const MentionNotificationItem = ({
       console.error(err);
     });
     // MOJO: park context for the database block to auto-open the
-    // row's detail panel after navigation. Two paths:
-    //  - blockId is set (regular @-mention with explicit block) →
-    //    walk up from the block to find the row.
-    //  - commentId is set (mention inside a comment) → block isn't
-    //    in the body, so the database block scans the doc for the
-    //    `comment-${id}` text attribute and walks up from there.
+    // row's detail panel after navigation — but ONLY when the
+    // notification is for an activity-log mention (blockId set, no
+    // commentId). Comment-thread mentions navigate to a thread the
+    // user wants to read; popping the card detail on top of the
+    // doc would hide the thread sidebar behind the modal.
     const commentId = (body as unknown as { commentId?: string }).commentId;
-    if (body.doc.blockId) {
+    if (body.doc.blockId && !commentId) {
       (
         globalThis as unknown as {
           __mojoOpenKanbanCardByBlockId?: { docId?: string; blockId?: string };
@@ -260,27 +259,6 @@ const MentionNotificationItem = ({
         };
         if (slot.__mojoOpenKanbanCardByBlockId?.blockId === body.doc.blockId) {
           delete slot.__mojoOpenKanbanCardByBlockId;
-        }
-      }, 10000);
-    }
-    if (commentId) {
-      (
-        globalThis as unknown as {
-          __mojoOpenKanbanCardByCommentId?: {
-            docId?: string;
-            commentId?: string;
-          };
-        }
-      ).__mojoOpenKanbanCardByCommentId = {
-        docId: body.doc.id,
-        commentId,
-      };
-      setTimeout(() => {
-        const slot = globalThis as {
-          __mojoOpenKanbanCardByCommentId?: { commentId?: string };
-        };
-        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
-          delete slot.__mojoOpenKanbanCardByCommentId;
         }
       }, 10000);
     }
@@ -883,36 +861,11 @@ const CommentNotificationItem = ({
       console.error(err);
     });
 
-    // MOJO: if the comment is on a kanban card, park a request so
-    // the database block can find the row by its `comment-${id}`
-    // text attribute and pop the row detail after navigation.
-    if (body.commentId) {
-      const commentId = body.commentId;
-      console.log('[mojo notif] click → setting commentId global', {
-        docId: body.doc.id,
-        commentId,
-        notificationType: notification.type,
-      });
-      (
-        globalThis as unknown as {
-          __mojoOpenKanbanCardByCommentId?: {
-            docId?: string;
-            commentId?: string;
-          };
-        }
-      ).__mojoOpenKanbanCardByCommentId = {
-        docId: body.doc.id,
-        commentId,
-      };
-      setTimeout(() => {
-        const slot = globalThis as {
-          __mojoOpenKanbanCardByCommentId?: { commentId?: string };
-        };
-        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
-          delete slot.__mojoOpenKanbanCardByCommentId;
-        }
-      }, 10000);
-    }
+    // MOJO: comment-thread notifications used to also park a global
+    // that opened the row's detail panel on top of the doc — but
+    // that hid the comment thread the user actually wanted to read
+    // behind the card modal. Let the standard navigation open the
+    // thread sidebar uncovered.
 
     jumpToPageComment(
       body.workspaceId,
@@ -988,36 +941,11 @@ const CommentMentionNotificationItem = ({
       console.error(err);
     });
 
-    // MOJO: if the comment is on a kanban card, park a request so
-    // the database block can find the row by its `comment-${id}`
-    // text attribute and pop the row detail after navigation.
-    if (body.commentId) {
-      const commentId = body.commentId;
-      console.log('[mojo notif] click → setting commentId global', {
-        docId: body.doc.id,
-        commentId,
-        notificationType: notification.type,
-      });
-      (
-        globalThis as unknown as {
-          __mojoOpenKanbanCardByCommentId?: {
-            docId?: string;
-            commentId?: string;
-          };
-        }
-      ).__mojoOpenKanbanCardByCommentId = {
-        docId: body.doc.id,
-        commentId,
-      };
-      setTimeout(() => {
-        const slot = globalThis as {
-          __mojoOpenKanbanCardByCommentId?: { commentId?: string };
-        };
-        if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
-          delete slot.__mojoOpenKanbanCardByCommentId;
-        }
-      }, 10000);
-    }
+    // MOJO: comment-thread notifications used to also park a global
+    // that opened the row's detail panel on top of the doc — but
+    // that hid the comment thread the user actually wanted to read
+    // behind the card modal. Let the standard navigation open the
+    // thread sidebar uncovered.
 
     jumpToPageComment(
       body.workspaceId,
