@@ -140,6 +140,12 @@ export interface ActivityLogDocContext {
   id: string;
   title: string;
   mode: DocMode;
+  /**
+   * MOJO: when the activity log lives on a kanban row, pass the row
+   * block id so mention notifications carry the block reference and
+   * the deadlines auto-open hook can pop the row's detail panel.
+   */
+  rowId?: string;
 }
 
 /**
@@ -176,6 +182,11 @@ export function useActivityLogPanel(
         id: docContext.id,
         title: docContext.title || 'Untitled',
         mode: docContext.mode,
+        // MOJO: pass the row block id when the activity log is per
+        // kanban card. The notification handler reads body.doc.blockId
+        // and the database block walks up from there to pop the row's
+        // detail panel.
+        ...(docContext.rowId ? { blockId: docContext.rowId } : {}),
       };
       for (const userId of recipients) {
         if (userId === account.id) continue;
@@ -191,6 +202,7 @@ export function useActivityLogPanel(
       docContext.id,
       docContext.title,
       docContext.mode,
+      docContext.rowId,
       notificationService,
     ]
   );

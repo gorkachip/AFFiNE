@@ -51,6 +51,10 @@ class ActivityLogManager {
       id: docId,
       title,
       mode: 'page' as ActivityLogDocContext['mode'],
+      // MOJO: include the kanban row id so mention notifications
+      // carry the block reference and the deadlines auto-open hook
+      // can pop the row's detail panel after navigation.
+      rowId: this.cell.rowId,
     };
   }
 
