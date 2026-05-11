@@ -561,6 +561,10 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       'mojo-open-kanban-card',
       this._mojoOnOpenCardEvent as EventListener
     );
+    document.removeEventListener(
+      'mojo-open-card-by-block',
+      this._mojoOnOpenCardByBlockEvent as EventListener
+    );
   }
 
   // MOJO: each database registers itself in a global set so the
@@ -580,6 +584,10 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       'mojo-open-kanban-card',
       this._mojoOnOpenCardEvent as EventListener
     );
+    document.addEventListener(
+      'mojo-open-card-by-block',
+      this._mojoOnOpenCardByBlockEvent as EventListener
+    );
   }
 
   private readonly _mojoOnOpenCardEvent = (
@@ -588,6 +596,28 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     const rowId = event.detail?.rowId;
     if (!rowId) return;
     this.mojoTryOpenRowDetail(rowId);
+  };
+
+  // MOJO: covers the "doc was already open when the user clicked a
+  // notification" case — the database block is already mounted, so
+  // the global-on-mount check never re-runs. Walk up from blockId
+  // to find the row owned by this database and pop its detail.
+  private readonly _mojoOnOpenCardByBlockEvent = (
+    event: CustomEvent<{ blockId?: string }>
+  ) => {
+    const blockId = event.detail?.blockId;
+    if (!blockId) return;
+    const block = this.model.store.getBlock(blockId);
+    if (!block) return;
+    let cur: { id: string; parent?: { id: string } | null } | null =
+      block.model;
+    while (cur && cur.id !== this.model.id) {
+      if (this.model.children?.some(c => c.id === cur!.id)) {
+        this.mojoTryOpenRowDetail(cur.id);
+        return;
+      }
+      cur = cur.parent ?? null;
+    }
   };
 
   // MOJO: handle the request the deadlines page (or any other

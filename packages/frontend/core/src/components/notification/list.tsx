@@ -245,22 +245,33 @@ const MentionNotificationItem = ({
     // doc would hide the thread sidebar behind the modal.
     const commentId = (body as unknown as { commentId?: string }).commentId;
     if (body.doc.blockId && !commentId) {
+      const blockId = body.doc.blockId;
       (
         globalThis as unknown as {
           __mojoOpenKanbanCardByBlockId?: { docId?: string; blockId?: string };
         }
       ).__mojoOpenKanbanCardByBlockId = {
         docId: body.doc.id,
-        blockId: body.doc.blockId,
+        blockId,
       };
       setTimeout(() => {
         const slot = globalThis as {
           __mojoOpenKanbanCardByBlockId?: { blockId?: string };
         };
-        if (slot.__mojoOpenKanbanCardByBlockId?.blockId === body.doc.blockId) {
+        if (slot.__mojoOpenKanbanCardByBlockId?.blockId === blockId) {
           delete slot.__mojoOpenKanbanCardByBlockId;
         }
       }, 10000);
+      // Dispatch the event in the next frame so an already-mounted
+      // database (the user is already on this doc) catches it. Cold
+      // mounts pick up the global on connectedCallback above.
+      requestAnimationFrame(() => {
+        document.dispatchEvent(
+          new CustomEvent('mojo-open-card-by-block', {
+            detail: { blockId },
+          })
+        );
+      });
     }
     jumpToPageBlock(
       body.workspace.id,
