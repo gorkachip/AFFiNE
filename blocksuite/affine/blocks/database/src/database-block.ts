@@ -660,6 +660,12 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       if (!commentId) return false;
       const target = `comment-${commentId}`;
       const models = this.model.store.getAllModels?.() ?? [];
+      console.log('[mojo notif] tryByCommentId', {
+        commentId,
+        databaseId: this.model.id,
+        rowCount: this.model.children?.length,
+        modelCount: models.length,
+      });
       const consumeFlag = () => {
         if (slot.__mojoOpenKanbanCardByCommentId?.commentId === commentId) {
           delete slot.__mojoOpenKanbanCardByCommentId;
@@ -691,10 +697,20 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
           }
         }
         if (!hasComment) continue;
+        console.log('[mojo notif] found commented block', {
+          commentId,
+          blockId: model.id,
+          flavour: (model as { flavour?: string }).flavour,
+        });
         if (openRowAncestor(model.id, consumeFlag)) {
+          console.log('[mojo notif] opened row detail');
           return true;
         }
+        console.log(
+          '[mojo notif] block found but no row ancestor in this database'
+        );
       }
+      console.log('[mojo notif] no commented block found in this database doc');
       return false;
     };
 

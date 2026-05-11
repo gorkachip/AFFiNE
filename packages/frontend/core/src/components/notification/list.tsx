@@ -880,6 +880,11 @@ const CommentNotificationItem = ({
     // text attribute and pop the row detail after navigation.
     if (body.commentId) {
       const commentId = body.commentId;
+      console.log('[mojo notif] click → setting commentId global', {
+        docId: body.doc.id,
+        commentId,
+        notificationType: notification.type,
+      });
       (
         globalThis as unknown as {
           __mojoOpenKanbanCardByCommentId?: {
@@ -976,6 +981,11 @@ const CommentMentionNotificationItem = ({
     // text attribute and pop the row detail after navigation.
     if (body.commentId) {
       const commentId = body.commentId;
+      console.log('[mojo notif] click → setting commentId global', {
+        docId: body.doc.id,
+        commentId,
+        notificationType: notification.type,
+      });
       (
         globalThis as unknown as {
           __mojoOpenKanbanCardByCommentId?: {
