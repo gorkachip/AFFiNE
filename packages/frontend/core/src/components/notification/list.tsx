@@ -223,6 +223,10 @@ const MentionNotificationItem = ({
   const memberInactived = !body.createdByUser;
 
   const handleClick = useCallback(() => {
+    console.log('[mojo notif] click on Mention notification', {
+      type: notification.type,
+      body,
+    });
     track.$.sidebar.notifications.clickNotification({
       type: notification.type,
       item: 'read',
