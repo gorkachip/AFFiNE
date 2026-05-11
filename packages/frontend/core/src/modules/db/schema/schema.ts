@@ -39,6 +39,15 @@ export const AFFiNE_WORKSPACE_DB_SCHEMA = {
     trashedBy: f.string().optional(),
     /** MOJO: timestamp the folder was trashed. */
     trashedAt: f.number().optional(),
+    /**
+     * MOJO folder lock (optional; undefined = unlocked).
+     * JSON encoded: `{ "lockedBy": userId, "lockedAt": timestamp }`.
+     * Locked folders (and every doc inside, recursively) become
+     * read-only and cannot be deleted, renamed or moved. Only the
+     * workspace owner/admins can lock or unlock. UI-level only —
+     * the row still syncs via Yjs to all clients.
+     */
+    lock: f.string().optional(),
   },
   docProperties: t.document({
     // { [`custom:{customPropertyId}`]: any }

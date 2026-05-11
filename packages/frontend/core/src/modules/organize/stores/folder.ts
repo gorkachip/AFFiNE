@@ -188,6 +188,51 @@ export class FolderStore extends Store {
     });
   }
 
+  // MOJO: lock/unlock a folder. Pass `lock` as a JSON string to lock,
+  // empty string to unlock. The ORM treats undefined as "no change", so
+  // unlocking via update would leave the field stale — we delete + recreate
+  // the row's lock state by passing an empty string instead.
+  setLock(folderId: string, lock: string) {
+    const node = this.dbService.db.folders.get(folderId);
+    if (node === null || node.type !== 'folder') {
+      throw new Error('Folder not found');
+    }
+    this.dbService.db.folders.update(folderId, {
+      lock: lock,
+    });
+  }
+
+  // MOJO: walk up from a node id (doc-link or folder) to find the nearest
+  // ancestor folder that is locked. Returns the lock JSON string and the
+  // folder id, or null if no ancestor is locked. Used to gate editor
+  // operations on docs that live inside a locked folder.
+  findLockedAncestor(
+    nodeId: string
+  ): { folderId: string; lock: string } | null {
+    const visited = new Set<string>();
+    let current: string | undefined = nodeId;
+    while (current && !visited.has(current)) {
+      visited.add(current);
+      const info = this.dbService.db.folders.get(current);
+      if (!info) return null;
+      if (info.type === 'folder' && info.lock) {
+        return { folderId: info.id, lock: info.lock };
+      }
+      current = info.parentId ?? undefined;
+    }
+    return null;
+  }
+
+  // MOJO: find the doc-link rows for a given docId across the workspace.
+  // A doc may be linked into more than one folder; we return all of them so
+  // the caller can check whether ANY ancestor is locked.
+  findLinksForDoc(docId: string) {
+    return this.dbService.db.folders.find({
+      type: 'doc',
+      data: docId,
+    });
+  }
+
   moveNode(nodeId: string, parentId: string | null, index: string) {
     const node = this.dbService.db.folders.get(nodeId);
     if (node === null) {

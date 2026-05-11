@@ -19,7 +19,9 @@ import {
   canUserSeeFolder,
   type FolderNode,
   OrganizeService,
+  parseLock,
   parseVisibility,
+  serializeLock,
 } from '@affine/core/modules/organize';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkspaceService } from '@affine/core/modules/workspace';
@@ -30,12 +32,14 @@ import { track } from '@affine/track';
 import {
   DeleteIcon,
   FolderIcon,
+  LockIcon,
   PageIcon,
   PlusIcon,
   PlusThickIcon,
   RemoveFolderIcon,
   ShareIcon,
   TagsIcon,
+  UnlockIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
 import { difference } from 'lodash-es';
@@ -231,6 +235,9 @@ const NavigationPanelFolderNodeFolder = ({
   const navigationPanelService = useService(NavigationPanelService);
   const name = useLiveData(node.name$);
   const visibilityRaw = useLiveData(node.visibility$);
+  const lockRaw = useLiveData(node.lock$);
+  const lock = useMemo(() => parseLock(lockRaw), [lockRaw]);
+  const locked = lock !== null;
   const createdBy = useLiveData(node.createdBy$);
   // MOJO: trashed folders are filtered out of the sidebar tree; they
   // surface in the dedicated Trash page instead.
@@ -287,7 +294,43 @@ const NavigationPanelFolderNodeFolder = ({
   const { createPage } = usePageHelper(
     workspaceService.workspace.docCollection
   );
+  const handleToggleLock = useCallback(() => {
+    if (!isOwnerOrAdmin) {
+      notify.error({
+        title: 'Only admins can lock or unlock folders',
+        message:
+          'Ask a workspace owner or admin to change the lock state of this folder.',
+      });
+      return;
+    }
+    if (locked) {
+      node.setLock('');
+      notify.success({ title: `"${name}" unlocked` });
+    } else {
+      const serialized = serializeLock({
+        lockedBy: currentUserId ?? '',
+        lockedAt: Date.now(),
+      });
+      if (serialized) {
+        node.setLock(serialized);
+        notify.success({
+          title: `"${name}" locked`,
+          message:
+            'Docs and subfolders inside are now read-only. Only admins can unlock.',
+        });
+      }
+    }
+  }, [isOwnerOrAdmin, locked, node, name, currentUserId]);
+
   const handleDelete = useCallback(() => {
+    if (locked) {
+      notify.error({
+        title: 'Folder is locked',
+        message:
+          'Unlock the folder first before deleting it. Only admins can unlock.',
+      });
+      return;
+    }
     if (!canManage) {
       notify.error({
         title: 'Cannot delete this folder',
@@ -306,7 +349,7 @@ const NavigationPanelFolderNodeFolder = ({
       }),
       message: t['com.affine.rootAppSidebar.organize.delete.notify-message'](),
     });
-  }, [canManage, name, node, t]);
+  }, [canManage, locked, name, node, t]);
 
   const children = useLiveData(node.sortedChildren$);
 
@@ -759,6 +802,34 @@ const NavigationPanelFolderNodeFolder = ({
           </IconButton>
         ),
       },
+      // MOJO: padlock indicator next to the "+" button when the folder
+      // is locked. Non-interactive — clicking it just shows a tooltip-y
+      // toast. Visible to everyone, not just admins, so collaborators
+      // know why they can't edit.
+      ...(locked
+        ? [
+            {
+              index: 1,
+              inline: true,
+              view: (
+                <IconButton
+                  size="16"
+                  onClick={e => {
+                    e.stopPropagation();
+                    notify.info({
+                      title: 'Folder is locked',
+                      message:
+                        'Docs inside are read-only. Only admins can unlock.',
+                    });
+                  }}
+                  tooltip="Locked — read-only"
+                >
+                  <LockIcon />
+                </IconButton>
+              ),
+            },
+          ]
+        : []),
       ...(canManage
         ? [
             {
@@ -769,6 +840,22 @@ const NavigationPanelFolderNodeFolder = ({
                   onClick={() => setShareOpen(true)}
                 >
                   Share folder
+                </MenuItem>
+              ),
+            },
+          ]
+        : []),
+      // MOJO: Lock / Unlock entry. Only workspace owners/admins see it.
+      ...(isOwnerOrAdmin
+        ? [
+            {
+              index: 98,
+              view: (
+                <MenuItem
+                  prefixIcon={locked ? <UnlockIcon /> : <LockIcon />}
+                  onClick={handleToggleLock}
+                >
+                  {locked ? 'Unlock folder' : 'Lock folder'}
                 </MenuItem>
               ),
             },
@@ -855,7 +942,10 @@ const NavigationPanelFolderNodeFolder = ({
     handleCreateSubfolder,
     handleDelete,
     handleNewDoc,
+    handleToggleLock,
     canManage,
+    isOwnerOrAdmin,
+    locked,
     passthrough,
     node,
     t,
@@ -872,8 +962,9 @@ const NavigationPanelFolderNodeFolder = ({
     (type: string, node: FolderNode) => {
       // MOJO: only the folder creator (or a workspace admin/owner) can
       // "Remove from folder" items under a folder. Collaborators who did
-      // not create the folder cannot mutate its contents.
-      if (!canManage) {
+      // not create the folder cannot mutate its contents. A locked
+      // folder also hides the entry — admins must unlock first.
+      if (!canManage || locked) {
         return [] satisfies NodeOperation[];
       }
       if (type === 'doc' || type === 'collection' || type === 'tag') {
@@ -896,7 +987,7 @@ const NavigationPanelFolderNodeFolder = ({
       }
       return [];
     },
-    [canManage, t]
+    [canManage, locked, t]
   );
 
   const handleCollapsedChange = useCallback(
@@ -924,23 +1015,23 @@ const NavigationPanelFolderNodeFolder = ({
         icon={NavigationPanelFolderIcon}
         name={name}
         dndData={dndData}
-        onDrop={canManage ? handleDropOnFolder : undefined}
+        onDrop={canManage && !locked ? handleDropOnFolder : undefined}
         defaultRenaming={defaultRenaming}
-        renameable={canManage}
+        renameable={canManage && !locked}
         extractEmojiAsIcon={enableEmojiIcon}
-        reorderable={canManage && reorderable}
+        reorderable={canManage && !locked && reorderable}
         collapsed={collapsed}
         setCollapsed={handleCollapsedChange}
-        onRename={canManage ? handleRename : undefined}
+        onRename={canManage && !locked ? handleRename : undefined}
         operations={finalOperations}
-        canDrop={canManage ? handleCanDrop : undefined}
+        canDrop={canManage && !locked ? handleCanDrop : undefined}
         childrenPlaceholder={
           <FolderEmpty
-            canDrop={canManage ? handleCanDrop : undefined}
-            onDrop={canManage ? handleDropOnPlaceholder : undefined}
+            canDrop={canManage && !locked ? handleCanDrop : undefined}
+            onDrop={canManage && !locked ? handleDropOnPlaceholder : undefined}
           />
         }
-        dropEffect={canManage ? handleDropEffect : undefined}
+        dropEffect={canManage && !locked ? handleDropEffect : undefined}
         data-testid={`navigation-panel-folder-${node.id}`}
         explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
       >

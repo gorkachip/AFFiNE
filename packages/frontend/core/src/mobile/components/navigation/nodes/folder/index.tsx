@@ -20,7 +20,10 @@ import { NavigationPanelService } from '@affine/core/modules/navigation-panel';
 import {
   type FolderNode,
   OrganizeService,
+  parseLock,
+  serializeLock,
 } from '@affine/core/modules/organize';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
@@ -28,12 +31,14 @@ import {
   DeleteIcon,
   FolderIcon,
   LayerIcon,
+  LockIcon,
   PageIcon,
   PlusIcon,
   PlusThickIcon,
   RemoveFolderIcon,
   ShareIcon,
   TagsIcon,
+  UnlockIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
 import { difference } from 'lodash-es';
@@ -142,19 +147,30 @@ const NavigationPanelFolderNodeFolder = ({
   parentPath: string[];
 }) => {
   const t = useI18n();
-  const { workspaceService, featureFlagService, workspaceDialogService } =
-    useServices({
-      WorkspaceService,
-      CompatibleFavoriteItemsAdapter,
-      FeatureFlagService,
-      WorkspaceDialogService,
-    });
+  const {
+    workspaceService,
+    featureFlagService,
+    workspaceDialogService,
+    workspacePermissionService,
+  } = useServices({
+    WorkspaceService,
+    CompatibleFavoriteItemsAdapter,
+    FeatureFlagService,
+    WorkspaceDialogService,
+    WorkspacePermissionService,
+  });
   const authService = useService(AuthService);
   const currentUserId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
   );
+  const isOwnerOrAdmin = useLiveData(
+    workspacePermissionService.permission.isOwnerOrAdmin$
+  );
   const [shareOpen, setShareOpen] = useState(false);
   const name = useLiveData(node.name$);
+  const lockRaw = useLiveData(node.lock$);
+  const lock = useMemo(() => parseLock(lockRaw), [lockRaw]);
+  const locked = lock !== null;
   const enableEmojiIcon = useLiveData(
     featureFlagService.flags.enable_emoji_folder_icon.$
   );
@@ -175,6 +191,13 @@ const NavigationPanelFolderNodeFolder = ({
     workspaceService.workspace.docCollection
   );
   const handleDelete = useCallback(() => {
+    if (locked) {
+      notify.error({
+        title: 'Folder is locked',
+        message: 'Unlock first. Only admins can unlock.',
+      });
+      return;
+    }
     node.delete();
     track.$.navigationPanel.organize.deleteOrganizeItem({
       type: 'folder',
@@ -185,7 +208,32 @@ const NavigationPanelFolderNodeFolder = ({
       }),
       message: t['com.affine.rootAppSidebar.organize.delete.notify-message'](),
     });
-  }, [name, node, t]);
+  }, [locked, name, node, t]);
+
+  const handleToggleLock = useCallback(() => {
+    if (!isOwnerOrAdmin) {
+      notify.error({
+        title: 'Only admins can lock or unlock folders',
+      });
+      return;
+    }
+    if (locked) {
+      node.setLock('');
+      notify.success({ title: `"${name}" unlocked` });
+    } else {
+      const serialized = serializeLock({
+        lockedBy: currentUserId ?? '',
+        lockedAt: Date.now(),
+      });
+      if (serialized) {
+        node.setLock(serialized);
+        notify.success({
+          title: `"${name}" locked`,
+          message: 'Docs inside are now read-only.',
+        });
+      }
+    }
+  }, [currentUserId, isOwnerOrAdmin, locked, name, node]);
 
   const children = useLiveData(node.sortedChildren$);
 
@@ -376,6 +424,23 @@ const NavigationPanelFolderNodeFolder = ({
         ),
       },
 
+      // MOJO: Lock / Unlock entry. Only workspace owners/admins see it.
+      ...(isOwnerOrAdmin
+        ? [
+            {
+              index: 160,
+              view: (
+                <MenuItem
+                  prefixIcon={locked ? <UnlockIcon /> : <LockIcon />}
+                  onClick={handleToggleLock}
+                >
+                  {locked ? 'Unlock folder' : 'Lock folder'}
+                </MenuItem>
+              ),
+            },
+          ]
+        : []),
+
       {
         index: 200,
         view: node.id ? <FavoriteFolderOperation id={node.id} /> : null,
@@ -405,6 +470,9 @@ const NavigationPanelFolderNodeFolder = ({
     handleDelete,
     handleNewDoc,
     handleRename,
+    handleToggleLock,
+    isOwnerOrAdmin,
+    locked,
     name,
     node.id,
     t,
@@ -419,6 +487,10 @@ const NavigationPanelFolderNodeFolder = ({
 
   const childrenOperations = useCallback(
     (type: string, node: FolderNode) => {
+      // MOJO: locked parent → hide remove entry. Admins must unlock first.
+      if (locked) {
+        return [] satisfies NodeOperation[];
+      }
       if (type === 'doc' || type === 'collection' || type === 'tag') {
         return [
           {
@@ -439,7 +511,7 @@ const NavigationPanelFolderNodeFolder = ({
       }
       return [];
     },
-    [t]
+    [locked, t]
   );
 
   const handleCollapsedChange = useCallback(

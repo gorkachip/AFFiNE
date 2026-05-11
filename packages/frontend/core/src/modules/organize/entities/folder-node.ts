@@ -23,6 +23,7 @@ export class FolderNode extends Entity<{
     trashed?: boolean | null;
     trashedBy?: string | null;
     trashedAt?: number | null;
+    lock?: string | null;
   } | null>(this.store.watchNodeInfo(this.id ?? ''), null);
   type$ = this.info$.map(info =>
     this.id === null ? 'folder' : (info?.type ?? '')
@@ -34,6 +35,7 @@ export class FolderNode extends Entity<{
   trashed$ = this.info$.map(info => info?.trashed ?? false);
   trashedBy$ = this.info$.map(info => info?.trashedBy ?? null);
   trashedAt$ = this.info$.map(info => info?.trashedAt ?? null);
+  lock$ = this.info$.map(info => info?.lock ?? null);
   children$ = LiveData.from<FolderNode[]>(
     // watch children if this is a folder, otherwise return empty array
     this.type$.pipe(
@@ -179,6 +181,16 @@ export class FolderNode extends Entity<{
       throw new Error('Cannot set visibility on non-folder node');
     }
     this.store.setVisibility(this.id, visibility);
+  }
+
+  setLock(lock: string) {
+    if (this.id === null) {
+      throw new Error('Cannot set lock on root node');
+    }
+    if (this.type$.value !== 'folder') {
+      throw new Error('Cannot set lock on non-folder node');
+    }
+    this.store.setLock(this.id, lock);
   }
 
   indexAt(at: 'before' | 'after', targetId?: string) {
