@@ -367,23 +367,40 @@ export const PeekViewModalContainer = forwardRef<
   useEffect(() => {
     if (!vtOpen) return;
     let lastReserved = -1;
-    const apply = () => {
+    const findSidebar = (): HTMLElement | null => {
+      // Most reliable: the right-sidebar-close button only exists
+      // when the sidebar is open. Walk up to the panel root.
+      const closeBtn = document.querySelector<HTMLElement>(
+        '[data-testid="right-sidebar-close"]'
+      );
+      if (closeBtn) {
+        let cur: HTMLElement | null = closeBtn;
+        while (cur && cur !== document.body) {
+          if (cur.offsetWidth > 200 && cur.offsetWidth < window.innerWidth) {
+            const rect = cur.getBoundingClientRect();
+            if (rect.right >= window.innerWidth - 4) return cur;
+          }
+          cur = cur.parentElement;
+        }
+      }
+      // Fallback: the resize panel that contains the sidebar.
       const panels = document.querySelectorAll<HTMLElement>(
         '[class*="workbenchSidebar"]'
       );
-      let panel: HTMLElement | null = null;
       for (const p of Array.from(panels)) {
-        if (p.offsetWidth > 0) {
-          panel = p;
-          break;
-        }
+        if (p.offsetWidth > 0) return p;
       }
+      return null;
+    };
+    const apply = () => {
+      const panel = findSidebar();
       const reserved = panel
         ? Math.max(0, window.innerWidth - panel.getBoundingClientRect().left)
         : 0;
       if (reserved === lastReserved) return;
       lastReserved = reserved;
       const right = reserved > 0 ? `${reserved}px` : '0px';
+      console.log('[mojo peek] sidebar reserved', { reserved, panel });
       if (overlayRef.current) overlayRef.current.style.right = right;
       const wrapper = contentClipRef.current?.parentElement?.parentElement;
       if (wrapper) wrapper.style.right = right;
