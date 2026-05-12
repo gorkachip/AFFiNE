@@ -751,44 +751,19 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     setTimeout(() => subscription.unsubscribe(), 8000);
   }
 
-  /** Open the row's own detail panel using the same peek-view path
-   *  the kanban click takes when available, so things like the
-   *  activity log modal land at the right z-index. Falls back to
-   *  popSideDetail when peek-view isn't registered. We bypass the
-   *  linked-doc preference in openDetailPanel intentionally —
-   *  /deadlines and notifications want the row detail itself,
-   *  not whatever doc the row title links to. */
+  /** Open the row's own detail panel via popSideDetail. We use
+   *  popSideDetail (not peek-view) because its modal is a plain
+   *  div whose width we shrink to leave the right sidebar
+   *  uncovered — clicks on the comments/threads sidebar reach the
+   *  sidebar normally instead of being swallowed by the
+   *  peek-view's full-screen Radix overlay. The activity log
+   *  modal opened from inside the card detail has its z-index
+   *  bumped above 1001 so it lands on top of popSideDetail. */
   mojoTryOpenRowDetail(rowId: string): boolean {
     if (!this.model.children?.some(c => c.id === rowId)) return false;
     const view = this.dataSource.value.viewManager.currentView$.value;
     if (!view) return false;
     requestAnimationFrame(() => {
-      const peekViewService = this.std.getOptional(PeekViewProvider);
-      if (peekViewService) {
-        const abort = new AbortController();
-        peekViewService
-          .peek(
-            {
-              target: this,
-              template: this.createTemplate({ view, rowId }, docId => {
-                peekViewService
-                  .peek({
-                    docId,
-                    databaseId: this.blockId,
-                    databaseDocId: this.model.store.id,
-                    databaseRowId: rowId,
-                    target: this,
-                  })
-                  .catch(() => {});
-              }),
-            },
-            { abortSignal: abort.signal }
-          )
-          .catch(e => {
-            console.warn('[mojo detail] peekView failed', e);
-          });
-        return;
-      }
       popSideDetail(
         this.createTemplate({ view, rowId }, () => {
           // No-op: the side detail close button cleans up itself.
