@@ -31,9 +31,33 @@ const contentOptions: Dialog.DialogContentProps = {
       // MOJO: clicks in the right sidebar (comments/threads panel)
       // shouldn't close the peek-view — users open the card from a
       // notification, then want to read / reply to threads alongside.
+      // Check the literal target first; if the modal overlay caught
+      // the click visually, fall back to scanning what's beneath it.
       el.closest('[class*="workbenchSidebar"]')
     ) {
       e.preventDefault();
+      return;
+    }
+    // MOJO fallback: when the overlay covers the sidebar visually,
+    // event.target lands on the overlay and the closest() check
+    // above misses. Look at every element under the cursor and
+    // bail out of close if any of them is in the workbench sidebar.
+    const original = (e.detail as { originalEvent?: PointerEvent })
+      ?.originalEvent;
+    if (original && typeof original.clientX === 'number') {
+      const stack = document.elementsFromPoint(
+        original.clientX,
+        original.clientY
+      );
+      for (const node of stack) {
+        if (
+          node instanceof HTMLElement &&
+          node.closest('[class*="workbenchSidebar"]')
+        ) {
+          e.preventDefault();
+          return;
+        }
+      }
     }
   },
   onEscapeKeyDown: e => {
