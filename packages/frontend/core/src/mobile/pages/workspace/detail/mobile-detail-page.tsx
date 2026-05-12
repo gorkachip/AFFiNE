@@ -184,12 +184,14 @@ const DetailPageImpl = () => {
 
   const canEdit = useGuard('Doc_Update', doc.id);
 
-  // MOJO: read folder lock state for this doc.
+  // MOJO: read folder lock state for this doc. Doc_Users_Manage
+  // (Manager / Owner role on this doc) bypasses the lock.
   const organizeService = useService(OrganizeService);
   const folderLock = useLiveData(
     organizeService.folderTree.lockForDoc$(doc.id)
   );
-  const isFolderLocked = folderLock !== null;
+  const canBypassLock = !!useGuard('Doc_Users_Manage', doc.id);
+  const isFolderLocked = folderLock !== null && !canBypassLock;
 
   const readonly =
     !canEdit ||

@@ -197,11 +197,15 @@ const DetailPageImpl = memo(function DetailPageImpl() {
 
   // MOJO: read folder lock state for this doc. If any ancestor folder is
   // locked, the editor switches to read-only and a banner is rendered.
+  // A user with Doc_Users_Manage (Manager / Owner role on this doc)
+  // bypasses the lock — the per-doc grant is treated as explicit
+  // "this person can edit anywhere".
   const organizeService = useService(OrganizeService);
   const folderLock = useLiveData(
     organizeService.folderTree.lockForDoc$(doc.id)
   );
-  const isFolderLocked = folderLock !== null;
+  const canBypassLock = !!useGuard('Doc_Users_Manage', doc.id);
+  const isFolderLocked = folderLock !== null && !canBypassLock;
 
   const onLoad = useCallback(
     (editorContainer: AffineEditorContainer) => {

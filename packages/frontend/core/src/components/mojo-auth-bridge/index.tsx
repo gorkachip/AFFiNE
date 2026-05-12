@@ -1,7 +1,10 @@
 import { notify } from '@affine/component';
 import { AuthService } from '@affine/core/modules/cloud';
 import { OrganizeService } from '@affine/core/modules/organize';
-import { WorkspacePermissionService } from '@affine/core/modules/permissions';
+import {
+  GuardService,
+  WorkspacePermissionService,
+} from '@affine/core/modules/permissions';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useEffect } from 'react';
 
@@ -17,6 +20,7 @@ export const MojoAuthBridge = () => {
   const authService = useService(AuthService);
   const permissionService = useService(WorkspacePermissionService);
   const organizeService = useService(OrganizeService);
+  const guardService = useService(GuardService);
 
   const userId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
@@ -56,13 +60,26 @@ export const MojoAuthBridge = () => {
   // (DocRecord.moveToTrash, DocsService.changeDocTitle, etc.) can
   // refuse mutations on docs that live inside a locked folder
   // without having to import OrganizeService themselves.
+  // A user with Doc_Users_Manage on the doc bypasses the lock — same
+  // rule as the editor's read-only banner — so per-doc Manager grants
+  // act as an explicit "this person can edit anywhere" override.
   useEffect(() => {
     (globalThis as any).__mojoFolderLockChecker = {
       isDocLocked: (docId: string): boolean => {
         try {
-          return (
-            organizeService.folderTree.lockForDoc$(docId).value !== null
-          );
+          const folderLocked =
+            organizeService.folderTree.lockForDoc$(docId).value !== null;
+          if (!folderLocked) return false;
+          // Kick a revalidation so the next call sees a fresh value if
+          // this is the first time the chokepoint is hit for this doc
+          // (sidebar paths can fire moveToTrash without opening the
+          // doc, which is what normally triggers can$ to load).
+          guardService.revalidateCan('Doc_Users_Manage', docId);
+          // can$ returns undefined while loading; treat undefined as
+          // "no bypass yet" so the lock holds until permissions resolve.
+          const canBypass =
+            guardService.can$('Doc_Users_Manage', docId).value === true;
+          return !canBypass;
         } catch {
           return false;
         }
@@ -71,7 +88,7 @@ export const MojoAuthBridge = () => {
     return () => {
       delete (globalThis as any).__mojoFolderLockChecker;
     };
-  }, [organizeService]);
+  }, [guardService, organizeService]);
 
   // Surface gate-blocked actions (silent framework deletes, kanban
   // row/column/view delete throws, etc.) as a user-visible toast. The

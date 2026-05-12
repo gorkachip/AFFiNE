@@ -201,12 +201,23 @@ export class FolderStore extends Store {
       throw new Error('Link not found');
     }
     // MOJO: refuse "Remove from folder" when the parent (or any
-    // ancestor of the parent) is locked.
+    // ancestor of the parent) is locked. For doc-links specifically,
+    // a user with Doc_Users_Manage on the underlying doc bypasses
+    // the lock — same rule as the editor read-only override.
     const locked = this.findLockedAncestor(linkId);
     if (locked) {
-      throw new Error(
-        'This item is inside a locked folder. Unlock the folder first (admins only).'
-      );
+      const checker = (globalThis as any).__mojoFolderLockChecker as
+        | { isDocLocked: (docId: string) => boolean }
+        | undefined;
+      const docId = link.type === 'doc' ? link.data : null;
+      const stillLocked = docId
+        ? (checker?.isDocLocked(docId) ?? true)
+        : true;
+      if (stillLocked) {
+        throw new Error(
+          'This item is inside a locked folder. Unlock the folder first (admins only).'
+        );
+      }
     }
     this.dbService.db.folders.delete(linkId);
   }
@@ -295,16 +306,23 @@ export class FolderStore extends Store {
     // MOJO: locked-folder enforcement. We refuse the move if EITHER the
     // current parent OR the target parent has a locked ancestor. This
     // covers both "drag out of a locked folder" and "drop into a locked
-    // folder", regardless of which UI path triggered it.
+    // folder", regardless of which UI path triggered it. For doc-links,
+    // Doc_Users_Manage on the underlying doc bypasses both checks.
+    const checker = (globalThis as any).__mojoFolderLockChecker as
+      | { isDocLocked: (docId: string) => boolean }
+      | undefined;
+    const docIdForBypass = node.type === 'doc' ? node.data : null;
+    const isLinkBypassed =
+      !!docIdForBypass && checker?.isDocLocked(docIdForBypass) === false;
     const sourceLocked = this.findLockedAncestor(nodeId);
-    if (sourceLocked) {
+    if (sourceLocked && !isLinkBypassed) {
       throw new Error(
         'This item is inside a locked folder. Unlock the folder first (admins only).'
       );
     }
     if (parentId) {
       const targetLocked = this.findLockedAncestor(parentId);
-      if (targetLocked) {
+      if (targetLocked && !isLinkBypassed) {
         throw new Error(
           'The destination folder is locked. Unlock it first (admins only).'
         );
