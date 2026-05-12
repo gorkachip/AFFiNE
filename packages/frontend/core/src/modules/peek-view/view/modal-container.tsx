@@ -27,7 +27,11 @@ const contentOptions: Dialog.DialogContentProps = {
     if (
       el.closest('[data-peek-view-wrapper]') ||
       // workaround for slash menu click outside issue
-      el.closest('affine-slash-menu')
+      el.closest('affine-slash-menu') ||
+      // MOJO: clicks in the right sidebar (comments/threads panel)
+      // shouldn't close the peek-view — users open the card from a
+      // notification, then want to read / reply to threads alongside.
+      el.closest('[class*="workbenchSidebar"]')
     ) {
       e.preventDefault();
     }
