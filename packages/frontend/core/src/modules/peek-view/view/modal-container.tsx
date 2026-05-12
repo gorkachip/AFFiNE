@@ -358,6 +358,41 @@ export const PeekViewModalContainer = forwardRef<
     };
   }, [onOpenChange]);
 
+  // MOJO: Radix Dialog modal=true puts the overlay on top of
+  // everything, so the right-sidebar (comments / threads) ends up
+  // covered and uninteractive — clicks pass through to the
+  // overlay and close the peek. Reserve the sidebar's width on
+  // both the overlay and the content wrapper so the sidebar stays
+  // visible and clickable while a card is peeked.
+  useEffect(() => {
+    if (!vtOpen) return;
+    let lastReserved = -1;
+    const apply = () => {
+      const panels = document.querySelectorAll<HTMLElement>(
+        '[class*="workbenchSidebar"]'
+      );
+      let panel: HTMLElement | null = null;
+      for (const p of Array.from(panels)) {
+        if (p.offsetWidth > 0) {
+          panel = p;
+          break;
+        }
+      }
+      const reserved = panel
+        ? Math.max(0, window.innerWidth - panel.getBoundingClientRect().left)
+        : 0;
+      if (reserved === lastReserved) return;
+      lastReserved = reserved;
+      const right = reserved > 0 ? `${reserved}px` : '0px';
+      if (overlayRef.current) overlayRef.current.style.right = right;
+      const wrapper = contentClipRef.current?.parentElement?.parentElement;
+      if (wrapper) wrapper.style.right = right;
+    };
+    apply();
+    const id = window.setInterval(apply, 250);
+    return () => window.clearInterval(id);
+  }, [vtOpen]);
+
   useLayoutEffect(() => {
     if (animation === 'zoom') {
       open ? animateZoomIn() : animateZoomOut();
