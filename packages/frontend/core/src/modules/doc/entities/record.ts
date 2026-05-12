@@ -97,6 +97,18 @@ export class DocRecord extends Entity<{ id: string }> {
     const ctx = (globalThis as any).__mojoAuthContext as
       | { userId: string | null; isOwnerOrAdmin: boolean }
       | undefined;
+    // MOJO: locked folder takes precedence over the regular permission
+    // check — even an admin must unlock first. This makes the lock
+    // intent explicit ("I clicked unlock") rather than silently
+    // overridden by elevated privileges.
+    const lockChecker = (globalThis as any).__mojoFolderLockChecker as
+      | { isDocLocked: (docId: string) => boolean }
+      | undefined;
+    if (lockChecker?.isDocLocked(this.id)) {
+      throw new Error(
+        'This document is in a locked folder. Unlock the folder first (admins only).'
+      );
+    }
     if (ctx) {
       const createdBy = this.property$('createdBy').value as string | undefined;
       const isCreator = !!ctx.userId && !!createdBy && ctx.userId === createdBy;

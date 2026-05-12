@@ -1,5 +1,6 @@
 import { notify } from '@affine/component';
 import { AuthService } from '@affine/core/modules/cloud';
+import { OrganizeService } from '@affine/core/modules/organize';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useEffect } from 'react';
@@ -15,6 +16,7 @@ import { CardActivityModalListener } from './card-activity-modal';
 export const MojoAuthBridge = () => {
   const authService = useService(AuthService);
   const permissionService = useService(WorkspacePermissionService);
+  const organizeService = useService(OrganizeService);
 
   const userId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
@@ -49,6 +51,27 @@ export const MojoAuthBridge = () => {
       delete (globalThis as any).__mojoAuthContext;
     };
   }, [userId, userName, isOwnerOrAdmin]);
+
+  // MOJO: install a synchronous lock checker so low-level entities
+  // (DocRecord.moveToTrash, DocsService.changeDocTitle, etc.) can
+  // refuse mutations on docs that live inside a locked folder
+  // without having to import OrganizeService themselves.
+  useEffect(() => {
+    (globalThis as any).__mojoFolderLockChecker = {
+      isDocLocked: (docId: string): boolean => {
+        try {
+          return (
+            organizeService.folderTree.lockForDoc$(docId).value !== null
+          );
+        } catch {
+          return false;
+        }
+      },
+    };
+    return () => {
+      delete (globalThis as any).__mojoFolderLockChecker;
+    };
+  }, [organizeService]);
 
   // Surface gate-blocked actions (silent framework deletes, kanban
   // row/column/view delete throws, etc.) as a user-visible toast. The

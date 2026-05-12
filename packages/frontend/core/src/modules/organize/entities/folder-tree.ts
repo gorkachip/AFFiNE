@@ -1,6 +1,7 @@
 import { Entity, LiveData } from '@toeverything/infra';
-import { map } from 'rxjs';
+import { combineLatest, map } from 'rxjs';
 
+import { parseLock } from '../services/folder-lock';
 import type { FolderStore } from '../stores/folder';
 import { FolderNode } from './folder-node';
 
@@ -46,4 +47,31 @@ export class FolderTree extends Entity {
       ),
     []
   );
+
+  // MOJO: stream the lock state for a given doc id. Returns the parsed
+  // FolderLock from the nearest locked ancestor folder, or null if no
+  // ancestor is locked. A doc may be linked into more than one folder —
+  // the FIRST locked ancestor wins (rare to have one locked + one not).
+  lockForDoc$(docId: string) {
+    return LiveData.from(
+      combineLatest([
+        this.folderStore.watchLinksForDoc(docId),
+        // Subscribing to the full folders stream forces this LiveData to
+        // recompute when any folder is locked / unlocked anywhere in the
+        // tree, not just when the doc-link rows change.
+        this.folderStore.watchAllFolders(),
+      ]).pipe(
+        map(([links]) => {
+          for (const link of links) {
+            const found = this.folderStore.findLockedAncestor(link.id);
+            if (found) {
+              return parseLock(found.lock);
+            }
+          }
+          return null;
+        })
+      ),
+      null
+    );
+  }
 }

@@ -80,6 +80,20 @@ export class FolderStore extends Store {
     if (node.type !== 'folder') {
       throw new Error('Cannot rename non-folder node');
     }
+    // MOJO: locked folders (or descendants of locked folders) cannot be
+    // renamed. setLock itself bypasses by writing the `lock` field, not
+    // the data/name field, so the toggle keeps working.
+    if (node.lock) {
+      throw new Error(
+        'Folder is locked. Unlock it first to rename (admins only).'
+      );
+    }
+    const ancestorLocked = this.findLockedAncestor(nodeId);
+    if (ancestorLocked) {
+      throw new Error(
+        'Folder is inside a locked folder. Unlock the parent first (admins only).'
+      );
+    }
     this.dbService.db.folders.update(nodeId, {
       data: name,
     });
@@ -147,6 +161,19 @@ export class FolderStore extends Store {
     if (info === null || info.type !== 'folder') {
       throw new Error('Folder not found');
     }
+    // MOJO: a locked folder (or any ancestor that's locked) cannot be
+    // trashed. Admins must unlock first.
+    if (info.lock) {
+      throw new Error(
+        'Folder is locked. Unlock it first (admins only).'
+      );
+    }
+    const ancestorLocked = this.findLockedAncestor(folderId);
+    if (ancestorLocked) {
+      throw new Error(
+        'Folder is inside a locked folder. Unlock the parent first (admins only).'
+      );
+    }
     this.dbService.db.folders.update(folderId, {
       trashed: true,
       trashedBy: trashedBy ?? undefined,
@@ -172,6 +199,14 @@ export class FolderStore extends Store {
     const link = this.dbService.db.folders.get(linkId);
     if (link === null || link.type === 'folder') {
       throw new Error('Link not found');
+    }
+    // MOJO: refuse "Remove from folder" when the parent (or any
+    // ancestor of the parent) is locked.
+    const locked = this.findLockedAncestor(linkId);
+    if (locked) {
+      throw new Error(
+        'This item is inside a locked folder. Unlock the folder first (admins only).'
+      );
     }
     this.dbService.db.folders.delete(linkId);
   }
@@ -233,10 +268,47 @@ export class FolderStore extends Store {
     });
   }
 
+  // MOJO: streaming variant of findLinksForDoc, used by FolderTree to
+  // recompute lock state reactively whenever a doc-link is added/removed.
+  watchLinksForDoc(docId: string) {
+    return this.dbService.db.folders.find$({
+      type: 'doc',
+      data: docId,
+    });
+  }
+
+  // MOJO: streaming variant for "any folder anywhere in the workspace".
+  // Used to invalidate computed lock-for-doc state when a folder is
+  // locked or unlocked higher up in the tree.
+  watchAllFolders() {
+    return this.dbService.db.folders.find$({
+      type: 'folder',
+    });
+  }
+
   moveNode(nodeId: string, parentId: string | null, index: string) {
     const node = this.dbService.db.folders.get(nodeId);
     if (node === null) {
       throw new Error('Node not found');
+    }
+
+    // MOJO: locked-folder enforcement. We refuse the move if EITHER the
+    // current parent OR the target parent has a locked ancestor. This
+    // covers both "drag out of a locked folder" and "drop into a locked
+    // folder", regardless of which UI path triggered it.
+    const sourceLocked = this.findLockedAncestor(nodeId);
+    if (sourceLocked) {
+      throw new Error(
+        'This item is inside a locked folder. Unlock the folder first (admins only).'
+      );
+    }
+    if (parentId) {
+      const targetLocked = this.findLockedAncestor(parentId);
+      if (targetLocked) {
+        throw new Error(
+          'The destination folder is locked. Unlock it first (admins only).'
+        );
+      }
     }
 
     if (parentId) {

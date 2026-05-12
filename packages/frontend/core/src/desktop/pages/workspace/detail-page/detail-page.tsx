@@ -23,6 +23,7 @@ import { EditorService } from '@affine/core/modules/editor';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { JournalService } from '@affine/core/modules/journal';
+import { OrganizeService } from '@affine/core/modules/organize';
 import { PeekViewService } from '@affine/core/modules/peek-view';
 import { RecentDocsService } from '@affine/core/modules/quicksearch';
 import {
@@ -194,6 +195,14 @@ const DetailPageImpl = memo(function DetailPageImpl() {
   const journalService = useService(JournalService);
   const isJournal = !!useLiveData(journalService.journalDate$(doc.id));
 
+  // MOJO: read folder lock state for this doc. If any ancestor folder is
+  // locked, the editor switches to read-only and a banner is rendered.
+  const organizeService = useService(OrganizeService);
+  const folderLock = useLiveData(
+    organizeService.folderTree.lockForDoc$(doc.id)
+  );
+  const isFolderLocked = folderLock !== null;
+
   const onLoad = useCallback(
     (editorContainer: AffineEditorContainer) => {
       const std = editorContainer.std;
@@ -322,7 +331,7 @@ const DetailPageImpl = memo(function DetailPageImpl() {
 
   const canEdit = useGuard('Doc_Update', doc.id);
 
-  const readonly = !canEdit || isInTrash;
+  const readonly = !canEdit || isInTrash || isFolderLocked;
 
   return (
     <FrameworkScope scope={editor.scope}>
@@ -342,6 +351,28 @@ const DetailPageImpl = memo(function DetailPageImpl() {
           {/* Add a key to force rerender when page changed, to avoid error boundary persisting. */}
           <AffineErrorBoundary key={doc.id}>
             <TopTip pageId={doc.id} workspace={workspace} />
+            {isFolderLocked ? (
+              <div
+                style={{
+                  padding: '8px 16px',
+                  background: 'var(--affine-warning-color)',
+                  color: 'var(--affine-pure-white)',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                <span aria-hidden>🔒</span>
+                <span>
+                  This document is in a locked folder — read-only. Only
+                  workspace admins can unlock.
+                </span>
+              </div>
+            ) : null}
             <Scrollable.Root>
               <Scrollable.Viewport
                 onScroll={handleScroll}

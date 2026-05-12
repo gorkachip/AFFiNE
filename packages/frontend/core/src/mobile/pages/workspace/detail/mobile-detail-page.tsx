@@ -17,6 +17,7 @@ import { EditorService } from '@affine/core/modules/editor';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { JournalService } from '@affine/core/modules/journal';
+import { OrganizeService } from '@affine/core/modules/organize';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { ViewService } from '@affine/core/modules/workbench/services/view';
 import { WorkspaceService } from '@affine/core/modules/workspace';
@@ -183,9 +184,17 @@ const DetailPageImpl = () => {
 
   const canEdit = useGuard('Doc_Update', doc.id);
 
+  // MOJO: read folder lock state for this doc.
+  const organizeService = useService(OrganizeService);
+  const folderLock = useLiveData(
+    organizeService.folderTree.lockForDoc$(doc.id)
+  );
+  const isFolderLocked = folderLock !== null;
+
   const readonly =
     !canEdit ||
     isInTrash ||
+    isFolderLocked ||
     !enableKeyboardToolbar ||
     (mode === 'edgeless' && !enableEdgelessEditing);
 
@@ -201,6 +210,20 @@ const DetailPageImpl = () => {
             styles.editorContainer
           )}
         >
+          {isFolderLocked ? (
+            <div
+              style={{
+                padding: '8px 16px',
+                background: 'var(--affine-warning-color)',
+                color: 'var(--affine-pure-white)',
+                textAlign: 'center',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              🔒 Locked folder — read-only.
+            </div>
+          ) : null}
           {/* Add a key to force rerender when page changed, to avoid error boundary persisting. */}
           <AffineErrorBoundary key={doc.id} className={styles.errorBoundary}>
             <PageDetailEditor onLoad={onLoad} readonly={readonly} />

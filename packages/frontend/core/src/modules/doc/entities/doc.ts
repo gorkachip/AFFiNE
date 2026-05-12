@@ -136,6 +136,18 @@ export class Doc extends Entity {
   }
 
   changeDocTitle(newTitle: string) {
+    // MOJO: refuse rename when the doc is inside a locked folder. The
+    // editor's title input is already disabled by blockSuiteDoc.readonly,
+    // but the sidebar rename path goes through DocsService.changeDocTitle
+    // → here, bypassing the read-only flag.
+    const lockChecker = (globalThis as any).__mojoFolderLockChecker as
+      | { isDocLocked: (docId: string) => boolean }
+      | undefined;
+    if (lockChecker?.isDocLocked(this.id)) {
+      throw new Error(
+        'This document is in a locked folder. Unlock the folder first (admins only).'
+      );
+    }
     const pageBlock = this.blockSuiteDoc.getBlocksByFlavour('affine:page').at(0)
       ?.model as RootBlockModel | undefined;
     if (pageBlock) {
