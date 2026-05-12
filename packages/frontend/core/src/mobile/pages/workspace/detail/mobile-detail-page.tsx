@@ -10,7 +10,7 @@ import { DetailPageWrapper } from '@affine/core/desktop/pages/workspace/detail-p
 import { PageHeader } from '@affine/core/mobile/components';
 import { useGlobalEvent } from '@affine/core/mobile/hooks/use-global-events';
 import { AIButtonService } from '@affine/core/modules/ai-button';
-import { ServerService } from '@affine/core/modules/cloud';
+import { AuthService, ServerService } from '@affine/core/modules/cloud';
 import { DocService } from '@affine/core/modules/doc';
 import { DocDisplayMetaService } from '@affine/core/modules/doc-display-meta';
 import { EditorService } from '@affine/core/modules/editor';
@@ -18,6 +18,10 @@ import { FeatureFlagService } from '@affine/core/modules/feature-flag';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { JournalService } from '@affine/core/modules/journal';
 import { OrganizeService } from '@affine/core/modules/organize';
+import {
+  MojoDocGrantsCacheService,
+  roleBypassesLock,
+} from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { ViewService } from '@affine/core/modules/workbench/services/view';
 import { WorkspaceService } from '@affine/core/modules/workspace';
@@ -184,13 +188,25 @@ const DetailPageImpl = () => {
 
   const canEdit = useGuard('Doc_Update', doc.id);
 
-  // MOJO: read folder lock state for this doc. Doc_Users_Manage
-  // (Manager / Owner role on this doc) bypasses the lock.
+  // MOJO: read folder lock state for this doc. Bypass requires an
+  // explicit per-user grant (Editor / Manager / Owner) in the share
+  // dialog members list — workspace default role is intentionally
+  // ignored.
   const organizeService = useService(OrganizeService);
   const folderLock = useLiveData(
     organizeService.folderTree.lockForDoc$(doc.id)
   );
-  const canBypassLock = !!useGuard('Doc_Users_Manage', doc.id);
+  const grantsCache = useService(MojoDocGrantsCacheService);
+  useEffect(() => {
+    void grantsCache.loadAll(doc.id).catch(() => {});
+  }, [grantsCache, doc.id]);
+  const currentUserIdForLock = useLiveData(
+    useService(AuthService).session.account$.map(a => a?.id ?? null)
+  );
+  const explicitRole = useLiveData(
+    grantsCache.explicitRoleFor$(doc.id, currentUserIdForLock)
+  );
+  const canBypassLock = roleBypassesLock(explicitRole);
   const isFolderLocked = folderLock !== null && !canBypassLock;
 
   const readonly =

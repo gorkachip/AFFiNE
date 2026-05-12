@@ -6,6 +6,10 @@ export {
 export { GuardService } from './services/guard';
 export { MemberSearchService } from './services/member-search';
 export { WorkspaceMembersService } from './services/members';
+export {
+  MojoDocGrantsCacheService,
+  roleBypassesLock,
+} from './services/mojo-doc-grants-cache';
 export { WorkspacePermissionService } from './services/permission';
 export {
   type DocPermissionActions,
@@ -28,6 +32,7 @@ import { DocGrantedUsersService } from './services/doc-granted-users';
 import { GuardService } from './services/guard';
 import { MemberSearchService } from './services/member-search';
 import { WorkspaceMembersService } from './services/members';
+import { MojoDocGrantsCacheService } from './services/mojo-doc-grants-cache';
 import { WorkspacePermissionService } from './services/permission';
 import { DocGrantedUsersStore } from './stores/doc-granted-users';
 import { GuardStore } from './stores/guard';
@@ -58,7 +63,11 @@ export function configurePermissionsModule(framework: Framework) {
       WorkspaceService,
       WorkspacePermissionService,
     ])
-    .store(GuardStore, [WorkspaceService, WorkspaceServerService]);
+    .store(GuardStore, [WorkspaceService, WorkspaceServerService])
+    .service(MojoDocGrantsCacheService, [
+      DocGrantedUsersStore,
+      WorkspaceService,
+    ]);
 
   framework
     .scope(WorkspaceScope)

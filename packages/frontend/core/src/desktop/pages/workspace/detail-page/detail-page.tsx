@@ -17,13 +17,17 @@ import { PageDetailEditor } from '@affine/core/components/page-detail-editor';
 import { WorkspacePropertySidebar } from '@affine/core/components/properties/sidebar';
 import { TrashPageFooter } from '@affine/core/components/pure/trash-page-footer';
 import { TopTip } from '@affine/core/components/top-tip';
-import { ServerService } from '@affine/core/modules/cloud';
+import { AuthService, ServerService } from '@affine/core/modules/cloud';
 import { DocService } from '@affine/core/modules/doc';
 import { EditorService } from '@affine/core/modules/editor';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { JournalService } from '@affine/core/modules/journal';
 import { OrganizeService } from '@affine/core/modules/organize';
+import {
+  MojoDocGrantsCacheService,
+  roleBypassesLock,
+} from '@affine/core/modules/permissions';
 import { PeekViewService } from '@affine/core/modules/peek-view';
 import { RecentDocsService } from '@affine/core/modules/quicksearch';
 import {
@@ -195,16 +199,27 @@ const DetailPageImpl = memo(function DetailPageImpl() {
   const journalService = useService(JournalService);
   const isJournal = !!useLiveData(journalService.journalDate$(doc.id));
 
-  // MOJO: read folder lock state for this doc. If any ancestor folder is
-  // locked, the editor switches to read-only and a banner is rendered.
-  // A user with Doc_Users_Manage (Manager / Owner role on this doc)
-  // bypasses the lock — the per-doc grant is treated as explicit
-  // "this person can edit anywhere".
+  // MOJO: read folder lock state for this doc. If any ancestor folder
+  // is locked, the editor switches to read-only and a banner is
+  // rendered. A user bypasses the lock ONLY when they hold an
+  // explicit per-user grant (Editor / Manager / Owner) in the share
+  // dialog members list — workspace default role is intentionally
+  // ignored, otherwise "Everyone Editor" makes the lock useless.
   const organizeService = useService(OrganizeService);
   const folderLock = useLiveData(
     organizeService.folderTree.lockForDoc$(doc.id)
   );
-  const canBypassLock = !!useGuard('Doc_Users_Manage', doc.id);
+  const grantsCache = useService(MojoDocGrantsCacheService);
+  useEffect(() => {
+    void grantsCache.loadAll(doc.id).catch(() => {});
+  }, [grantsCache, doc.id]);
+  const currentUserIdForLock = useLiveData(
+    useService(AuthService).session.account$.map(a => a?.id ?? null)
+  );
+  const explicitRole = useLiveData(
+    grantsCache.explicitRoleFor$(doc.id, currentUserIdForLock)
+  );
+  const canBypassLock = roleBypassesLock(explicitRole);
   const isFolderLocked = folderLock !== null && !canBypassLock;
 
   const onLoad = useCallback(

@@ -3,6 +3,8 @@ import { AuthService } from '@affine/core/modules/cloud';
 import { OrganizeService } from '@affine/core/modules/organize';
 import {
   GuardService,
+  MojoDocGrantsCacheService,
+  roleBypassesLock,
   WorkspacePermissionService,
 } from '@affine/core/modules/permissions';
 import { useLiveData, useService } from '@toeverything/infra';
@@ -21,6 +23,7 @@ export const MojoAuthBridge = () => {
   const permissionService = useService(WorkspacePermissionService);
   const organizeService = useService(OrganizeService);
   const guardService = useService(GuardService);
+  const grantsCache = useService(MojoDocGrantsCacheService);
 
   const userId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
@@ -70,16 +73,20 @@ export const MojoAuthBridge = () => {
           const folderLocked =
             organizeService.folderTree.lockForDoc$(docId).value !== null;
           if (!folderLocked) return false;
-          // Kick a revalidation so the next call sees a fresh value if
-          // this is the first time the chokepoint is hit for this doc
-          // (sidebar paths can fire moveToTrash without opening the
-          // doc, which is what normally triggers can$ to load).
-          guardService.revalidateCan('Doc_Users_Manage', docId);
-          // can$ returns undefined while loading; treat undefined as
-          // "no bypass yet" so the lock holds until permissions resolve.
-          const canBypass =
-            guardService.can$('Doc_Users_Manage', docId).value === true;
-          return !canBypass;
+          // Bypass: only an EXPLICIT per-user grant (Editor / Manager
+          // / Owner) on this doc lifts the lock. Workspace default
+          // role does NOT bypass — that's the whole point of the
+          // lock vs the standard Doc_Update permission.
+          // Kick off a fetch so the next chokepoint call has data.
+          // The current call returns "locked" until pages are loaded
+          // (safe-by-default).
+          void grantsCache.loadAll(docId).catch(() => {});
+          if (!userId) return true;
+          const explicitRole = grantsCache.getExplicitRoleSync(
+            docId,
+            userId
+          );
+          return !roleBypassesLock(explicitRole);
         } catch {
           return false;
         }
@@ -88,7 +95,7 @@ export const MojoAuthBridge = () => {
     return () => {
       delete (globalThis as any).__mojoFolderLockChecker;
     };
-  }, [guardService, organizeService]);
+  }, [grantsCache, guardService, organizeService, userId]);
 
   // Surface gate-blocked actions (silent framework deletes, kanban
   // row/column/view delete throws, etc.) as a user-visible toast. The
