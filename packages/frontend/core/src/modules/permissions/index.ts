@@ -64,6 +64,11 @@ export function configurePermissionsModule(framework: Framework) {
       WorkspacePermissionService,
     ])
     .store(GuardStore, [WorkspaceService, WorkspaceServerService])
+    // MOJO: register the granted-users store at WorkspaceScope (it
+    // only needs WorkspaceServerService) so the workspace-scoped
+    // MojoDocGrantsCacheService can resolve it. The doc-scoped
+    // DocGrantedUsersService inherits from the parent scope.
+    .store(DocGrantedUsersStore, [WorkspaceServerService])
     .service(MojoDocGrantsCacheService, [
       DocGrantedUsersStore,
       WorkspaceService,
@@ -76,6 +81,5 @@ export function configurePermissionsModule(framework: Framework) {
       DocGrantedUsersStore,
       WorkspaceService,
       DocService,
-    ])
-    .store(DocGrantedUsersStore, [WorkspaceServerService]);
+    ]);
 }
