@@ -57,6 +57,15 @@ export const CardActivityModal = ({
         style: {
           maxHeight: '70vh',
           overflowY: 'auto',
+          // MOJO: popSideDetail's modal sits at z-index 1001 — bump
+          // the activity log above it so it's not buried behind the
+          // expanded card detail.
+          zIndex: 1100,
+        },
+      }}
+      overlayOptions={{
+        style: {
+          zIndex: 1099,
         },
       }}
     >
