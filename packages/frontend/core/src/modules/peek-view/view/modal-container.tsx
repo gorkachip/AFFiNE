@@ -22,43 +22,13 @@ type WAAPIAnimationParams = Parameters<typeof waapi.animate>[1];
 
 const contentOptions: Dialog.DialogContentProps = {
   ['data-testid' as string]: 'peek-view-modal',
+  // MOJO: never close the peek on outside clicks. Users want to
+  // interact with the right sidebar (comments / threads), the
+  // app sidebar (folders), and toolbars while a card is peeked
+  // without it collapsing under them. The X button and ESC still
+  // close, which is the standard expectation anyway.
   onPointerDownOutside: e => {
-    const el = e.target as HTMLElement;
-    if (
-      el.closest('[data-peek-view-wrapper]') ||
-      // workaround for slash menu click outside issue
-      el.closest('affine-slash-menu') ||
-      // MOJO: clicks in the right sidebar (comments/threads panel)
-      // shouldn't close the peek-view — users open the card from a
-      // notification, then want to read / reply to threads alongside.
-      // Check the literal target first; if the modal overlay caught
-      // the click visually, fall back to scanning what's beneath it.
-      el.closest('[class*="workbenchSidebar"]')
-    ) {
-      e.preventDefault();
-      return;
-    }
-    // MOJO fallback: when the overlay covers the sidebar visually,
-    // event.target lands on the overlay and the closest() check
-    // above misses. Look at every element under the cursor and
-    // bail out of close if any of them is in the workbench sidebar.
-    const original = (e.detail as { originalEvent?: PointerEvent })
-      ?.originalEvent;
-    if (original && typeof original.clientX === 'number') {
-      const stack = document.elementsFromPoint(
-        original.clientX,
-        original.clientY
-      );
-      for (const node of stack) {
-        if (
-          node instanceof HTMLElement &&
-          node.closest('[class*="workbenchSidebar"]')
-        ) {
-          e.preventDefault();
-          return;
-        }
-      }
-    }
+    e.preventDefault();
   },
   onEscapeKeyDown: e => {
     // prevent closing the modal when pressing escape key by default
@@ -382,56 +352,18 @@ export const PeekViewModalContainer = forwardRef<
     };
   }, [onOpenChange]);
 
-  // MOJO: Radix Dialog modal=true puts the overlay on top of
-  // everything, so the right-sidebar (comments / threads) ends up
-  // covered and uninteractive — clicks pass through to the
-  // overlay and close the peek. Reserve the sidebar's width on
-  // both the overlay and the content wrapper so the sidebar stays
-  // visible and clickable while a card is peeked.
+  // MOJO: let clicks pass through the overlay and wrapper to
+  // whatever's beneath (right sidebar, app sidebar, toolbars),
+  // but keep the card-box itself interactive. Combined with the
+  // always-preventDefault in onPointerDownOutside above, the card
+  // stays open and surrounding UI stays clickable.
   useEffect(() => {
     if (!vtOpen) return;
-    let lastReserved = -1;
-    const findSidebar = (): HTMLElement | null => {
-      // Most reliable: the right-sidebar-close button only exists
-      // when the sidebar is open. Walk up to the panel root.
-      const closeBtn = document.querySelector<HTMLElement>(
-        '[data-testid="right-sidebar-close"]'
-      );
-      if (closeBtn) {
-        let cur: HTMLElement | null = closeBtn;
-        while (cur && cur !== document.body) {
-          if (cur.offsetWidth > 200 && cur.offsetWidth < window.innerWidth) {
-            const rect = cur.getBoundingClientRect();
-            if (rect.right >= window.innerWidth - 4) return cur;
-          }
-          cur = cur.parentElement;
-        }
-      }
-      // Fallback: the resize panel that contains the sidebar.
-      const panels = document.querySelectorAll<HTMLElement>(
-        '[class*="workbenchSidebar"]'
-      );
-      for (const p of Array.from(panels)) {
-        if (p.offsetWidth > 0) return p;
-      }
-      return null;
-    };
-    const apply = () => {
-      const panel = findSidebar();
-      const reserved = panel
-        ? Math.max(0, window.innerWidth - panel.getBoundingClientRect().left)
-        : 0;
-      if (reserved === lastReserved) return;
-      lastReserved = reserved;
-      const right = reserved > 0 ? `${reserved}px` : '0px';
-      console.log('[mojo peek] sidebar reserved', { reserved, panel });
-      if (overlayRef.current) overlayRef.current.style.right = right;
-      const wrapper = contentClipRef.current?.parentElement?.parentElement;
-      if (wrapper) wrapper.style.right = right;
-    };
-    apply();
-    const id = window.setInterval(apply, 250);
-    return () => window.clearInterval(id);
+    if (overlayRef.current) overlayRef.current.style.pointerEvents = 'none';
+    const cardBox = contentClipRef.current?.parentElement;
+    const wrapper = cardBox?.parentElement;
+    if (wrapper) wrapper.style.pointerEvents = 'none';
+    if (cardBox) cardBox.style.pointerEvents = 'auto';
   }, [vtOpen]);
 
   useLayoutEffect(() => {
