@@ -422,7 +422,14 @@ export class DocModel extends BaseModel {
 
     return docs.map(doc => ({
       external: doc?.public ? DocRole.External : null,
-      workspace: doc?.defaultRole ?? DocRole.Manager,
+      // MOJO: upstream defaults the per-doc workspace role to Manager,
+      // which means any workspace member who opens a doc they were not
+      // explicitly invited to inherits Manager and can call
+      // grantDocUserRoles to add themselves (or anyone) as Editor —
+      // bypassing folder/doc locks via the Share panel. Drop the default
+      // to Editor so only Owner/Admin of the workspace, or explicit
+      // doc-level Manager/Owner grants, can manage doc users.
+      workspace: doc?.defaultRole ?? DocRole.Editor,
     }));
   }
 
