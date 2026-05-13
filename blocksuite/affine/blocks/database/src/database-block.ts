@@ -48,7 +48,7 @@ import {
 import { type BlockComponent, BlockSelection } from '@blocksuite/std';
 import { RANGE_SYNC_EXCLUDE_ATTR } from '@blocksuite/std/inline';
 import { Slice } from '@blocksuite/store';
-import { autoUpdate } from '@floating-ui/dom';
+import { autoPlacement, autoUpdate, offset } from '@floating-ui/dom';
 import { computed, signal } from '@preact/signals-core';
 import { html, nothing } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
@@ -272,6 +272,22 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                     return menu.subMenu({
                       name: label,
                       options: { items: rowActions },
+                      // MOJO: open the per-row actions menu to the side of
+                      // the row (not below it) so moving the cursor toward
+                      // View / Restore / Delete forever doesn't pass over
+                      // the next sibling row, which would close this submenu
+                      // via its own mouseenter handler.
+                      middleware: [
+                        offset({ mainAxis: 0, crossAxis: 0 }),
+                        autoPlacement({
+                          allowedPlacements: [
+                            'right-start',
+                            'left-start',
+                            'right-end',
+                            'left-end',
+                          ],
+                        }),
+                      ],
                     });
                   }),
                 ],
