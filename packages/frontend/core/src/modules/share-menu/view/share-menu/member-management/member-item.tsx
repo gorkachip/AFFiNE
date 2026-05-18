@@ -25,6 +25,7 @@ import clsx from 'clsx';
 import { useCallback, useMemo } from 'react';
 
 import { PlanTag } from '../plan-tag';
+import { useDocCanManageUsers } from '../use-doc-can-manage-users';
 import * as styles from './member-item.css';
 
 export const MemberItem = ({
@@ -140,7 +141,7 @@ const Options = ({
 
   const canTransferOwner =
     useGuard('Doc_TransferOwner', docService.doc.id) && !!isWorkspaceOwner;
-  const canManageUsers = useGuard('Doc_Users_Manage', docService.doc.id);
+  const canManageUsers = useDocCanManageUsers(docService.doc.id);
 
   const updateUserRole = useCallback(
     async (userId: string, role: DocRole) => {

@@ -16,6 +16,7 @@ import * as styles from './index.css';
 import { InviteInput } from './invite-member-editor';
 import { MembersRow } from './member-management';
 import type { ShareMenuProps } from './share-menu';
+import { useDocCanManageUsers } from './use-doc-can-manage-users';
 
 export const LocalSharePage = (props: ShareMenuProps) => {
   const t = useI18n();
@@ -65,7 +66,7 @@ export const AFFiNESharePage = (
   const serverService = useService(ServerService);
   const docService = useService(DocService);
 
-  const canManageUsers = useGuard('Doc_Users_Manage', docService.doc.id);
+  const canManageUsers = useDocCanManageUsers(docService.doc.id);
 
   const canPublish = useGuard('Doc_Publish', docService.doc.id);
 

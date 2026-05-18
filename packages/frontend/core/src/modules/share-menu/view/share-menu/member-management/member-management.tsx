@@ -1,5 +1,4 @@
 import { Skeleton } from '@affine/component';
-import { useGuard } from '@affine/core/components/guard';
 import { DocService } from '@affine/core/modules/doc';
 import {
   DocGrantedUsersService,
@@ -12,6 +11,7 @@ import { useCallback, useEffect } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 
 import { Scroller } from '../scroller';
+import { useDocCanManageUsers } from '../use-doc-can-manage-users';
 import { MemberItem } from './member-item';
 import * as styles from './member-management.css';
 
@@ -34,7 +34,7 @@ export const MemberManagement = ({
   );
   const docService = useService(DocService);
 
-  const canManageUsers = useGuard('Doc_Users_Manage', docService.doc.id);
+  const canManageUsers = useDocCanManageUsers(docService.doc.id);
 
   const t = useI18n();
 
