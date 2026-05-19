@@ -56,6 +56,10 @@ export const ActivityLogValueRenderer = ({
           sideOffset: 4,
           align: 'start',
           className: styles.popoverRoot,
+          // MOJO: keep clear of the viewport edges so the popover gets
+          // shrunk by Radix rather than clipped when the trigger sits
+          // near the bottom (e.g. inside a peek-view).
+          collisionPadding: 12,
         }}
         items={popoverBody}
       >

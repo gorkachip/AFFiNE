@@ -40,7 +40,8 @@ export const cellSnippet = style({
 
 export const popoverContent = style({
   width: 460,
-  maxHeight: 520,
+  // MOJO: viewport-aware cap — see activity-log.css.ts popoverRoot.
+  maxHeight: 'min(520px, var(--radix-popper-available-height, 520px))',
   padding: 0,
   background: cssVarV2('layer/background/primary'),
   border: `1px solid ${cssVarV2('layer/insideBorder/border')}`,
@@ -52,5 +53,8 @@ export const popoverContent = style({
 export const popoverInner = style({
   display: 'flex',
   flexDirection: 'column',
-  maxHeight: 520,
+  // Inherit the popoverContent cap; height:100% lets the flex children
+  // (entryList scroll area + sticky inputArea) size correctly.
+  height: '100%',
+  maxHeight: 'min(520px, var(--radix-popper-available-height, 520px))',
 });

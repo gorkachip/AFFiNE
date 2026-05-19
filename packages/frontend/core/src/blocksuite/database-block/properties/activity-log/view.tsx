@@ -112,6 +112,10 @@ const ActivityLogCellComponent: ForwardRefRenderFunction<
           className: styles.popoverContent,
           align: 'start',
           sideOffset: 4,
+          // MOJO: keep the popover off the viewport edge so Radix
+          // shrinks --radix-popper-available-height for us when the
+          // cell sits near the bottom of the screen.
+          collisionPadding: 12,
         }}
         content={<div className={styles.popoverInner}>{popoverBody}</div>}
       >

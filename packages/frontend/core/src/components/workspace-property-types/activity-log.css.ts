@@ -34,7 +34,10 @@ export const triggerSnippet = style({
 
 export const popoverRoot = style({
   width: 460,
-  maxHeight: 520,
+  // MOJO: cap height to the viewport-aware Radix var so the popover
+  // never overflows the screen when opened from a low-positioned trigger
+  // (e.g. activity log property near the bottom of a peek-view).
+  maxHeight: 'min(520px, var(--radix-popper-available-height, 520px))',
   display: 'flex',
   flexDirection: 'column',
   background: cssVarV2('layer/background/primary'),
@@ -154,6 +157,9 @@ export const inputArea = style({
   gap: 8,
   background: cssVarV2('layer/background/primary'),
   position: 'relative',
+  // MOJO: never let the input row shrink — when the popover is height-
+  // constrained the entry list scrolls, the compose box stays visible.
+  flexShrink: 0,
 });
 
 export const replyingTo = style({
@@ -179,6 +185,9 @@ export const textarea = style({
   color: cssVarV2('text/primary'),
   resize: 'vertical',
   outline: 'none',
+  // MOJO: keep the textarea visible when the popover is height-bounded;
+  // without this the entry list above (flex:1) can squeeze it to 0.
+  flexShrink: 0,
   selectors: {
     '&:focus': {
       borderColor: cssVarV2('text/emphasis'),
