@@ -150,14 +150,21 @@ export class FolderStore extends Store {
       }
     }
 
-    // MOJO: every new folder is private by default — only the creator
-    // (and workspace owners/admins, who short-circuit the visibility
-    // check) can see it. The user can flip it to public from the
-    // folder's options menu later. Defaulting to private avoids the
-    // "I keep forgetting to set it private" leak.
-    const visibility = createdBy
-      ? JSON.stringify({ mode: 'restricted', users: [createdBy] })
-      : undefined;
+    // MOJO: visibility defaults depend on where the folder is created.
+    //
+    // - SUBFOLDER (parentId set): default to 'inherit' so the share of
+    //   the parent cascades down automatically. The user can override
+    //   per-folder to public or specific-people from the Share dialog.
+    //
+    // - ROOT FOLDER: default to restricted-to-creator so a fresh top-
+    //   level folder isn't exposed workspace-wide until explicitly shared.
+    //   Root folders have no parent to inherit from, so 'inherit' would
+    //   degrade to public (see resolveEffectiveVisibility).
+    const visibility = parentId
+      ? JSON.stringify({ mode: 'inherit' })
+      : createdBy
+        ? JSON.stringify({ mode: 'restricted', users: [createdBy] })
+        : undefined;
 
     return this.dbService.db.folders.create({
       parentId: parentId,
@@ -310,6 +317,49 @@ export class FolderStore extends Store {
       current = info.parentId ?? undefined;
     }
     return null;
+  }
+
+  // MOJO: resolve a folder's effective visibility by walking up through
+  // any 'inherit' ancestors. Returns the nearest non-inherit visibility,
+  // or public if the lineage hits the root while still inheriting (an
+  // orphan inherit shouldn't ghost a folder out of view). Parses the raw
+  // JSON inline to avoid importing folder-visibility from the store
+  // module (would create a circular dep with the service module).
+  resolveEffectiveVisibility(folderId: string): {
+    mode: 'public' | 'restricted';
+    users: string[];
+  } {
+    const visited = new Set<string>();
+    let current: string | undefined = folderId;
+    while (current && !visited.has(current)) {
+      visited.add(current);
+      const info = this.dbService.db.folders.get(current);
+      if (!info || info.type !== 'folder') {
+        return { mode: 'public', users: [] };
+      }
+      const raw = info.visibility;
+      if (!raw) return { mode: 'public', users: [] };
+      try {
+        const parsed = JSON.parse(raw) as {
+          mode?: string;
+          users?: string[];
+        };
+        if (parsed.mode === 'restricted') {
+          return {
+            mode: 'restricted',
+            users: Array.isArray(parsed.users) ? parsed.users : [],
+          };
+        }
+        if (parsed.mode === 'public' || parsed.mode === undefined) {
+          return { mode: 'public', users: [] };
+        }
+        // inherit — keep walking up
+      } catch {
+        return { mode: 'public', users: [] };
+      }
+      current = info.parentId ?? undefined;
+    }
+    return { mode: 'public', users: [] };
   }
 
   // MOJO: find the doc-link rows for a given docId across the workspace.

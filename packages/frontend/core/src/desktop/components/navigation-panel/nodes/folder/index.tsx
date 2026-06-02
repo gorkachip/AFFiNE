@@ -20,7 +20,6 @@ import {
   type FolderNode,
   OrganizeService,
   parseLock,
-  parseVisibility,
   serializeLock,
 } from '@affine/core/modules/organize';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
@@ -172,18 +171,23 @@ export const NavigationPanelFolderNode = ({
 // MOJO: walk a folder's descendants synchronously and report whether any
 // of them is directly visible to the user. Used so that a parent folder
 // the user can't see itself but contains a shared subfolder still appears
-// in the sidebar as a passthrough so they can navigate down.
+// in the sidebar as a passthrough so they can navigate down. The
+// organizeService is passed so we can resolve EFFECTIVE visibility (which
+// walks up through 'inherit' ancestors) instead of just the raw row.
 function hasVisibleDescendant(
   node: FolderNode,
   userId: string | null,
-  isOwnerOrAdmin: boolean
+  isOwnerOrAdmin: boolean,
+  organizeService: OrganizeService
 ): boolean {
   for (const child of node.children$.value) {
     if (child.type$.value !== 'folder') continue;
     if (child.trashed$.value) continue;
-    const v = parseVisibility(child.visibility$.value);
+    if (!child.id) continue;
+    const v = organizeService.folderTree.resolveEffectiveVisibility(child.id);
     if (canUserSeeFolder(v, userId, isOwnerOrAdmin)) return true;
-    if (hasVisibleDescendant(child, userId, isOwnerOrAdmin)) return true;
+    if (hasVisibleDescendant(child, userId, isOwnerOrAdmin, organizeService))
+      return true;
   }
   return false;
 }
@@ -266,10 +270,15 @@ const NavigationPanelFolderNodeFolder = ({
   // MOJO: the gate the UI uses for hiding affordances — admins/owners
   // bypass, so `enforceLock` is false for them even when `locked` is true.
   const enforceLock = locked && !isOwnerOrAdmin;
+  // MOJO: visibility is computed from the EFFECTIVE visibility — walks
+  // up through any 'inherit' ancestors. That's how share-folder cascades
+  // to subfolders without re-listing users at every level.
+  const effectiveVisibility = useLiveData(
+    organizeService.folderTree.effectiveVisibilityForFolder$(node.id ?? '')
+  );
   const visible = useMemo(() => {
-    const v = parseVisibility(visibilityRaw);
-    return canUserSeeFolder(v, currentUserId, !!isOwnerOrAdmin);
-  }, [visibilityRaw, currentUserId, isOwnerOrAdmin]);
+    return canUserSeeFolder(effectiveVisibility, currentUserId, !!isOwnerOrAdmin);
+  }, [effectiveVisibility, currentUserId, isOwnerOrAdmin]);
   // Children list is read here (not just for rendering) so we can detect
   // whether the user has access to any descendant when they don't have
   // direct visibility on this folder. If they do, render this folder in
@@ -283,8 +292,13 @@ const NavigationPanelFolderNodeFolder = ({
     // up on the next re-render rather than reactively (fine for the rare
     // event of a share toggle).
     void childrenSnapshot.length;
-    return hasVisibleDescendant(node, currentUserId, !!isOwnerOrAdmin);
-  }, [visible, childrenSnapshot, currentUserId, isOwnerOrAdmin, node]);
+    return hasVisibleDescendant(
+      node,
+      currentUserId,
+      !!isOwnerOrAdmin,
+      organizeService
+    );
+  }, [visible, childrenSnapshot, currentUserId, isOwnerOrAdmin, node, organizeService]);
   const isCreator =
     !!currentUserId && !!createdBy && createdBy === currentUserId;
   // Creator, owners and admins can manage this folder (share visibility +

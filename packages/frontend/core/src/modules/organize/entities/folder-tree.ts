@@ -67,6 +67,30 @@ export class FolderTree extends Entity {
     );
   }
 
+  // MOJO: stream the EFFECTIVE visibility for a folder — resolves any
+  // 'inherit' modes by walking up the tree to the nearest concrete
+  // public/restricted ancestor. Recomputes whenever any folder in the
+  // tree changes, so re-sharing a parent instantly cascades to children
+  // that inherit from it.
+  effectiveVisibilityForFolder$(folderId: string) {
+    return LiveData.from(
+      this.folderStore
+        .watchAllFolders()
+        .pipe(
+          map(() => this.folderStore.resolveEffectiveVisibility(folderId))
+        ),
+      { mode: 'public' as const, users: [] as string[] }
+    );
+  }
+
+  // MOJO: synchronous resolver — same walk as the LiveData variant but
+  // returns immediately. Used inside render-time helpers (e.g. the
+  // passthrough check that walks the descendant tree) where subscribing
+  // to per-node LiveDatas would create N subscriptions per render.
+  resolveEffectiveVisibility(folderId: string) {
+    return this.folderStore.resolveEffectiveVisibility(folderId);
+  }
+
   // MOJO: stream the lock state for a given doc id. Returns the parsed
   // FolderLock from the nearest locked ancestor folder, or null if no
   // ancestor is locked. A doc may be linked into more than one folder —

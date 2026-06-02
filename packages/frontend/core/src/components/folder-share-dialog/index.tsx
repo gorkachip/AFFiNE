@@ -53,12 +53,18 @@ export const FolderShareDialog = ({
 
   const folderName = useLiveData(folder.name$);
   const visibilityRaw = useLiveData(folder.visibility$);
+  // MOJO: root folders (no parentId) can't "inherit from parent" because
+  // there's no parent — hide the option in that case.
+  const folderInfo = useLiveData(folder.info$);
+  const hasParent = folderInfo?.parentId != null;
   const initial = useMemo(
     () => parseVisibility(visibilityRaw),
     [visibilityRaw]
   );
 
-  const [mode, setMode] = useState<'public' | 'restricted'>(initial.mode);
+  const [mode, setMode] = useState<'public' | 'restricted' | 'inherit'>(
+    initial.mode
+  );
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(
     new Set(initial.users)
   );
@@ -107,8 +113,11 @@ export const FolderShareDialog = ({
   const handleSave = useCallback(() => {
     if (mode === 'public') {
       // Write an explicit empty string so the ORM overwrites any prior
-      // 'restricted' JSON. parseVisibility() treats '' as public.
+      // 'restricted'/'inherit' JSON. parseVisibility() treats '' as public.
       folder.setVisibility('');
+    } else if (mode === 'inherit') {
+      const serialized = serializeVisibility({ mode: 'inherit', users: [] });
+      folder.setVisibility(serialized ?? '');
     } else {
       // Always include the current user as a safety net.
       const users = new Set(selectedUsers);
@@ -133,13 +142,35 @@ export const FolderShareDialog = ({
       <div style={{ padding: '8px 0 16px' }}>
         <RadioGroup
           value={mode}
-          onChange={v => setMode(v as 'public' | 'restricted')}
+          onChange={v => setMode(v as 'public' | 'restricted' | 'inherit')}
           items={[
+            // MOJO: inherit is the cascade default for new subfolders — show
+            // it only when the folder has a parent to inherit from.
+            ...(hasParent
+              ? [{ value: 'inherit', label: 'Inherit from parent' }]
+              : []),
             { value: 'public', label: 'Workspace (everyone)' },
             { value: 'restricted', label: 'Specific people' },
           ]}
         />
       </div>
+      {mode === 'inherit' && (
+        <div
+          style={{
+            padding: 12,
+            border: '1px solid var(--affine-border-color)',
+            borderRadius: 8,
+            background: 'var(--affine-background-secondary-color)',
+            fontSize: 13,
+            color: 'var(--affine-text-secondary-color)',
+            marginBottom: 16,
+          }}
+        >
+          This folder will be visible to whoever can see its parent folder.
+          Share the parent to add or remove people — changes cascade down
+          automatically.
+        </div>
+      )}
 
       {mode === 'restricted' && (
         <div style={{ marginBottom: 16 }}>

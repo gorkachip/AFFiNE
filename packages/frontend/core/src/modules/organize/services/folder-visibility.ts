@@ -4,18 +4,21 @@ import { Service } from '@toeverything/infra';
  * MOJO folder visibility helpers.
  *
  * Visibility is stored as an optional JSON string on the folder row:
- *   { mode: 'public' | 'restricted', users: string[] }
+ *   { mode: 'public' | 'restricted' | 'inherit', users: string[] }
  *
  * - No visibility set → public (all workspace members see the folder).
  * - mode === 'public' → same as above.
  * - mode === 'restricted' → only listed user IDs (plus workspace owner) see it.
+ * - mode === 'inherit' → defer to the nearest non-inherit ancestor. New
+ *   subfolders created inside a shared folder default to this so the share
+ *   cascades down without the admin re-listing users at every level.
  *
  * NOTE: this is UI-level filtering only; the folder row is still synced via
  * Yjs to every client. Not a security boundary.
  */
 
 export interface FolderVisibility {
-  mode: 'public' | 'restricted';
+  mode: 'public' | 'restricted' | 'inherit';
   users: string[];
 }
 
@@ -31,6 +34,9 @@ export function parseVisibility(
         users: Array.isArray(parsed.users) ? parsed.users : [],
       };
     }
+    if (parsed.mode === 'inherit') {
+      return { mode: 'inherit', users: [] };
+    }
     return { mode: 'public', users: [] };
   } catch {
     return { mode: 'public', users: [] };
@@ -39,6 +45,7 @@ export function parseVisibility(
 
 export function serializeVisibility(v: FolderVisibility): string | undefined {
   if (v.mode === 'public') return undefined;
+  if (v.mode === 'inherit') return JSON.stringify({ mode: 'inherit' });
   return JSON.stringify({ mode: 'restricted', users: v.users });
 }
 
@@ -50,6 +57,11 @@ export function canUserSeeFolder(
   if (visibility.mode === 'public') return true;
   if (isWorkspaceOwnerOrAdmin) return true;
   if (!userId) return false;
+  // MOJO: 'inherit' must be resolved to a concrete public/restricted state
+  // BEFORE calling this — by the store's resolveEffectiveVisibility walker.
+  // If an unresolved 'inherit' reaches here, fall back to "hidden" so we
+  // never accidentally expose a folder whose lineage couldn't be resolved.
+  if (visibility.mode === 'inherit') return false;
   return visibility.users.includes(userId);
 }
 
