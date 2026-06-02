@@ -422,14 +422,16 @@ export class DocModel extends BaseModel {
 
     return docs.map(doc => ({
       external: doc?.public ? DocRole.External : null,
-      // MOJO: upstream defaults the per-doc workspace role to Manager,
-      // which means any workspace member who opens a doc they were not
-      // explicitly invited to inherits Manager and can call
-      // grantDocUserRoles to add themselves (or anyone) as Editor —
-      // bypassing folder/doc locks via the Share panel. Drop the default
-      // to Editor so only Owner/Admin of the workspace, or explicit
-      // doc-level Manager/Owner grants, can manage doc users.
-      workspace: doc?.defaultRole ?? DocRole.Editor,
+      // MOJO: default workspace doc role is Reader. Sharing a folder
+      // makes its docs VISIBLE to the granted users (via folder cascade),
+      // but visibility ≠ edit access — anyone who opens a doc they
+      // weren't explicitly granted Editor/Manager/Owner on can only
+      // read it. To edit, the admin grants Editor on the specific doc
+      // from its Share panel. Was Editor (commit 5f264ba) and Manager
+      // upstream; both let any workspace member edit anything they
+      // could open, which collided with the folder-share model where
+      // we want "viewer by default, edit on request".
+      workspace: doc?.defaultRole ?? DocRole.Reader,
     }));
   }
 
