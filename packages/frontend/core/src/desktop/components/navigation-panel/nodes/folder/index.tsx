@@ -233,11 +233,23 @@ const NavigationPanelFolderNodeFolder = ({
     WorkspacePermissionService,
   });
   const navigationPanelService = useService(NavigationPanelService);
+  const organizeService = useService(OrganizeService);
   const name = useLiveData(node.name$);
   const visibilityRaw = useLiveData(node.visibility$);
-  const lockRaw = useLiveData(node.lock$);
-  const lock = useMemo(() => parseLock(lockRaw), [lockRaw]);
-  const locked = lock !== null;
+  const ownLockRaw = useLiveData(node.lock$);
+  const ownLock = useMemo(() => parseLock(ownLockRaw), [ownLockRaw]);
+  // MOJO: effective lock = own lock OR any locked ancestor. Without this,
+  // descendants of a locked folder rendered as unlocked, so rename / new-
+  // subfolder UI stayed enabled — and the store throw on submit froze the
+  // inline editor.
+  const effectiveLock = useLiveData(
+    organizeService.folderTree.lockForFolder$(node.id ?? '')
+  );
+  const locked = effectiveLock !== null;
+  // True only when the lock is inherited (this folder isn't directly
+  // locked, but an ancestor is). Used to hide the Lock/Unlock toggle —
+  // you can't unlock a node you didn't lock; do it at the ancestor.
+  const lockInherited = locked && ownLock === null;
   const createdBy = useLiveData(node.createdBy$);
   // MOJO: trashed folders are filtered out of the sidebar tree; they
   // surface in the dedicated Trash page instead.
@@ -303,7 +315,11 @@ const NavigationPanelFolderNodeFolder = ({
       });
       return;
     }
-    if (locked) {
+    // MOJO: operate on the OWN lock — `locked` may be true because of an
+    // ancestor, and unlocking a node that isn't directly locked is a no-op
+    // (the inherited lock keeps applying). The menu entry is hidden in
+    // that case, but stay defensive in case of stale callbacks.
+    if (ownLock !== null) {
       node.setLock('');
       notify.success({ title: `"${name}" unlocked` });
     } else {
@@ -320,7 +336,7 @@ const NavigationPanelFolderNodeFolder = ({
         });
       }
     }
-  }, [isOwnerOrAdmin, locked, node, name, currentUserId]);
+  }, [isOwnerOrAdmin, ownLock, node, name, currentUserId]);
 
   const handleDelete = useCallback(() => {
     if (locked) {
@@ -373,7 +389,17 @@ const NavigationPanelFolderNodeFolder = ({
 
   const handleRename = useCallback(
     (newName: string) => {
-      node.rename(newName);
+      // MOJO: store-side guards (locked ancestor, missing node, etc) throw
+      // synchronously. Without this catch the throw propagated out of the
+      // inline editor and froze the sidebar; turn it into a toast.
+      try {
+        node.rename(newName);
+      } catch (err) {
+        notify.error({
+          title: 'Cannot rename folder',
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
     },
     [node]
   );
@@ -706,25 +732,41 @@ const NavigationPanelFolderNodeFolder = ({
   );
 
   const handleNewDoc = useCallback(() => {
-    const newDoc = createPage();
-    node.createLink('doc', newDoc.id, node.indexAt('before'));
-    track.$.navigationPanel.folders.createDoc();
-    track.$.navigationPanel.organize.createOrganizeItem({
-      type: 'link',
-      target: 'doc',
-    });
-    setCollapsed(false);
+    // MOJO: store throws if any ancestor is locked — turn into a toast.
+    try {
+      const newDoc = createPage();
+      node.createLink('doc', newDoc.id, node.indexAt('before'));
+      track.$.navigationPanel.folders.createDoc();
+      track.$.navigationPanel.organize.createOrganizeItem({
+        type: 'link',
+        target: 'doc',
+      });
+      setCollapsed(false);
+    } catch (err) {
+      notify.error({
+        title: 'Cannot add doc',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   }, [createPage, node, setCollapsed]);
 
   const handleCreateSubfolder = useCallback(() => {
-    const newFolderId = node.createFolder(
-      t['com.affine.rootAppSidebar.organize.new-folders'](),
-      node.indexAt('before'),
-      currentUserId ?? undefined
-    );
-    track.$.navigationPanel.organize.createOrganizeItem({ type: 'folder' });
-    setCollapsed(false);
-    setNewFolderId(newFolderId);
+    // MOJO: store throws if this parent (or an ancestor) is locked.
+    try {
+      const newFolderId = node.createFolder(
+        t['com.affine.rootAppSidebar.organize.new-folders'](),
+        node.indexAt('before'),
+        currentUserId ?? undefined
+      );
+      track.$.navigationPanel.organize.createOrganizeItem({ type: 'folder' });
+      setCollapsed(false);
+      setNewFolderId(newFolderId);
+    } catch (err) {
+      notify.error({
+        title: 'Cannot create subfolder',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   }, [currentUserId, node, setCollapsed, t]);
 
   const handleAddToFolder = useCallback(
@@ -787,21 +829,27 @@ const NavigationPanelFolderNodeFolder = ({
     // (or a workspace owner/admin) can rename / share / delete the
     // folder itself.
     return [
-      {
-        index: 0,
-        inline: true,
-        view: (
-          <IconButton
-            size="16"
-            onClick={handleNewDoc}
-            tooltip={t[
-              'com.affine.rootAppSidebar.explorer.organize-add-tooltip'
-            ]()}
-          >
-            <PlusIcon />
-          </IconButton>
-        ),
-      },
+      // MOJO: hide the inline "+" when the folder is locked (own or
+      // inherited) — adding content into it would just toast-fail.
+      ...(locked
+        ? []
+        : [
+            {
+              index: 0,
+              inline: true,
+              view: (
+                <IconButton
+                  size="16"
+                  onClick={handleNewDoc}
+                  tooltip={t[
+                    'com.affine.rootAppSidebar.explorer.organize-add-tooltip'
+                  ]()}
+                >
+                  <PlusIcon />
+                </IconButton>
+              ),
+            },
+          ]),
       // MOJO: padlock indicator next to the "+" button when the folder
       // is locked. Non-interactive — clicking it just shows a tooltip-y
       // toast. Visible to everyone, not just admins, so collaborators
@@ -846,70 +894,85 @@ const NavigationPanelFolderNodeFolder = ({
           ]
         : []),
       // MOJO: Lock / Unlock entry. Only workspace owners/admins see it.
-      ...(isOwnerOrAdmin
+      // Hide it entirely when the lock is inherited from a parent — the
+      // toggle would lie ("Unlock" does nothing because this node isn't
+      // directly locked); the admin must unlock at the ancestor.
+      ...(isOwnerOrAdmin && !lockInherited
         ? [
             {
               index: 98,
               view: (
                 <MenuItem
-                  prefixIcon={locked ? <UnlockIcon /> : <LockIcon />}
+                  prefixIcon={ownLock !== null ? <UnlockIcon /> : <LockIcon />}
                   onClick={handleToggleLock}
                 >
-                  {locked ? 'Unlock folder' : 'Lock folder'}
+                  {ownLock !== null ? 'Unlock folder' : 'Lock folder'}
                 </MenuItem>
               ),
             },
           ]
         : []),
-      {
-        index: 100,
-        view: (
-          <MenuItem prefixIcon={<FolderIcon />} onClick={handleCreateSubfolder}>
-            {t['com.affine.rootAppSidebar.organize.folder.create-subfolder']()}
-          </MenuItem>
-        ),
-      },
-      {
-        index: 101,
-        view: (
-          <MenuItem
-            prefixIcon={<PageIcon />}
-            onClick={() => handleAddToFolder('doc')}
-          >
-            {t['com.affine.rootAppSidebar.organize.folder.add-docs']()}
-          </MenuItem>
-        ),
-      },
-      {
-        index: 102,
-        view: (
-          <MenuSub
-            triggerOptions={{
-              prefixIcon: <PlusThickIcon />,
-            }}
-            items={
-              <>
+      // MOJO: hide all add-content entries under a lock (own or inherited).
+      ...(locked
+        ? []
+        : [
+            {
+              index: 100,
+              view: (
                 <MenuItem
-                  onClick={() => handleAddToFolder('tag')}
-                  prefixIcon={<TagsIcon />}
-                >
-                  {t['com.affine.rootAppSidebar.organize.folder.add-tags']()}
-                </MenuItem>
-                <MenuItem
-                  onClick={() => handleAddToFolder('collection')}
-                  prefixIcon={<AnimatedCollectionsIcon closed={false} />}
+                  prefixIcon={<FolderIcon />}
+                  onClick={handleCreateSubfolder}
                 >
                   {t[
-                    'com.affine.rootAppSidebar.organize.folder.add-collections'
+                    'com.affine.rootAppSidebar.organize.folder.create-subfolder'
                   ]()}
                 </MenuItem>
-              </>
-            }
-          >
-            {t['com.affine.rootAppSidebar.organize.folder.add-others']()}
-          </MenuSub>
-        ),
-      },
+              ),
+            },
+            {
+              index: 101,
+              view: (
+                <MenuItem
+                  prefixIcon={<PageIcon />}
+                  onClick={() => handleAddToFolder('doc')}
+                >
+                  {t['com.affine.rootAppSidebar.organize.folder.add-docs']()}
+                </MenuItem>
+              ),
+            },
+            {
+              index: 102,
+              view: (
+                <MenuSub
+                  triggerOptions={{
+                    prefixIcon: <PlusThickIcon />,
+                  }}
+                  items={
+                    <>
+                      <MenuItem
+                        onClick={() => handleAddToFolder('tag')}
+                        prefixIcon={<TagsIcon />}
+                      >
+                        {t[
+                          'com.affine.rootAppSidebar.organize.folder.add-tags'
+                        ]()}
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => handleAddToFolder('collection')}
+                        prefixIcon={<AnimatedCollectionsIcon closed={false} />}
+                      >
+                        {t[
+                          'com.affine.rootAppSidebar.organize.folder.add-collections'
+                        ]()}
+                      </MenuItem>
+                    </>
+                  }
+                >
+                  {t['com.affine.rootAppSidebar.organize.folder.add-others']()}
+                </MenuSub>
+              ),
+            },
+          ]),
 
       {
         index: 200,
@@ -946,6 +1009,8 @@ const NavigationPanelFolderNodeFolder = ({
     canManage,
     isOwnerOrAdmin,
     locked,
+    lockInherited,
+    ownLock,
     passthrough,
     node,
     t,

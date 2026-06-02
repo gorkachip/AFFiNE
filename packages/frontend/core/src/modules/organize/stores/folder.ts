@@ -63,6 +63,14 @@ export class FolderStore extends Store {
     if (parent === null || parent.type !== 'folder') {
       throw new Error('Parent folder not found');
     }
+    // MOJO: same rule as createFolder — no adding items into a locked
+    // folder (or anything below one).
+    const lockedAncestor = this.findLockedAncestor(parentId);
+    if (lockedAncestor) {
+      throw new Error(
+        'Cannot add items to a locked folder. Unlock the parent first (admins only).'
+      );
+    }
 
     this.dbService.db.folders.create({
       parentId,
@@ -109,6 +117,16 @@ export class FolderStore extends Store {
       const parent = this.dbService.db.folders.get(parentId);
       if (parent === null || parent.type !== 'folder') {
         throw new Error('Parent folder not found');
+      }
+      // MOJO: a locked folder freezes its contents — no creating new
+      // children inside it (nor inside any descendant of a locked
+      // folder). findLockedAncestor walks from the parent up, so it
+      // catches both the immediate parent and higher ancestors.
+      const lockedAncestor = this.findLockedAncestor(parentId);
+      if (lockedAncestor) {
+        throw new Error(
+          'Cannot create folder inside a locked folder. Unlock the parent first (admins only).'
+        );
       }
     }
 

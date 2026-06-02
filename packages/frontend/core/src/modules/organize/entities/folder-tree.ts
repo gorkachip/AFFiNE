@@ -48,6 +48,25 @@ export class FolderTree extends Entity {
     []
   );
 
+  // MOJO: stream the lock state for a given folder id. Returns the parsed
+  // FolderLock of the folder itself or of its nearest locked ancestor,
+  // or null if neither is locked. Recomputes any time any folder in the
+  // tree is locked / unlocked so descendants see the change instantly.
+  lockForFolder$(folderId: string) {
+    return LiveData.from(
+      this.folderStore.watchAllFolders().pipe(
+        map(() => {
+          // findLockedAncestor walks from the node itself up, so it
+          // returns the folder's own lock if set, or the nearest
+          // locked ancestor — exactly what the UI needs.
+          const found = this.folderStore.findLockedAncestor(folderId);
+          return found ? parseLock(found.lock) : null;
+        })
+      ),
+      null
+    );
+  }
+
   // MOJO: stream the lock state for a given doc id. Returns the parsed
   // FolderLock from the nearest locked ancestor folder, or null if no
   // ancestor is locked. A doc may be linked into more than one folder —
