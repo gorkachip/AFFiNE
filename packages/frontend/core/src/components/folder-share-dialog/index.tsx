@@ -1,11 +1,11 @@
-import { Button, Modal, RadioGroup } from '@affine/component';
+import { Button, Input, Modal, RadioGroup } from '@affine/component';
 import { AuthService } from '@affine/core/modules/cloud';
 import type { FolderNode } from '@affine/core/modules/organize';
 import {
   parseVisibility,
   serializeVisibility,
 } from '@affine/core/modules/organize';
-import { WorkspaceMembersService } from '@affine/core/modules/permissions';
+import { MemberSearchService } from '@affine/core/modules/permissions';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -42,12 +42,11 @@ export const FolderShareDialog = ({
   open,
   onOpenChange,
 }: FolderShareDialogProps) => {
-  const membersService = useService(WorkspaceMembersService);
+  const memberSearchService = useService(MemberSearchService);
   const authService = useService(AuthService);
-  const members = membersService.members;
-  const pageMembers = useLiveData(members.pageMembers$);
-  const memberCount = useLiveData(members.memberCount$);
-  const isLoading = useLiveData(members.isLoading$);
+  const results = useLiveData(memberSearchService.result$);
+  const hasMore = useLiveData(memberSearchService.hasMore$);
+  const isLoading = useLiveData(memberSearchService.isLoading$);
   const currentUserId = useLiveData(
     authService.session.account$.map(a => a?.id ?? null)
   );
@@ -63,6 +62,7 @@ export const FolderShareDialog = ({
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(
     new Set(initial.users)
   );
+  const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -71,10 +71,21 @@ export const FolderShareDialog = ({
       if (currentUserId) seed.add(currentUserId);
       setMode(initial.mode);
       setSelectedUsers(seed);
-      members.setPageNum(0);
-      members.revalidate();
+      setSearchInput('');
+      memberSearchService.search('');
     }
-  }, [open, initial.mode, initial.users, members, currentUserId]);
+  }, [open, initial.mode, initial.users, memberSearchService, currentUserId]);
+
+  // MOJO: debounce the search input so each keystroke doesn't fire a
+  // graphql query. 200ms is short enough to feel live, long enough to
+  // coalesce typing in a 9–30 person workspace.
+  useEffect(() => {
+    if (!open) return;
+    const handle = setTimeout(() => {
+      memberSearchService.search(searchInput.trim() || '');
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [open, searchInput, memberSearchService]);
 
   const toggleUser = useCallback(
     (userId: string) => {
@@ -131,68 +142,90 @@ export const FolderShareDialog = ({
       </div>
 
       {mode === 'restricted' && (
-        <div
-          style={{
-            maxHeight: 320,
-            overflowY: 'auto',
-            border: '1px solid var(--affine-border-color)',
-            borderRadius: 8,
-            padding: 8,
-            marginBottom: 16,
-          }}
-        >
-          {isLoading && !pageMembers ? (
-            <div style={{ padding: 16, textAlign: 'center' }}>Loading…</div>
-          ) : pageMembers && pageMembers.length > 0 ? (
-            pageMembers.map(m => {
-              const isSelf = m.id === currentUserId;
-              return (
-                <label
-                  key={m.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '8px 6px',
-                    cursor: isSelf ? 'not-allowed' : 'pointer',
-                    opacity: isSelf ? 0.7 : 1,
-                  }}
-                  title={isSelf ? 'You always have access' : ''}
-                >
-                  <input
-                    type="checkbox"
-                    style={checkboxStyle}
-                    checked={selectedUsers.has(m.id)}
-                    disabled={isSelf}
-                    onChange={() => toggleUser(m.id)}
-                  />
-                  <span>
-                    {m.name ?? m.email ?? m.id}
-                    {isSelf ? ' (you)' : ''}
-                  </span>
-                </label>
-              );
-            })
-          ) : (
-            <div style={{ padding: 16, textAlign: 'center' }}>
-              No members loaded.
-            </div>
-          )}
-          {memberCount !== undefined &&
-            pageMembers &&
-            memberCount > pageMembers.length && (
+        <div style={{ marginBottom: 16 }}>
+          <Input
+            placeholder="Search members by name or email…"
+            value={searchInput}
+            onChange={value => setSearchInput(value)}
+            style={{ marginBottom: 8 }}
+            data-testid="folder-share-search"
+          />
+          <div
+            style={{
+              maxHeight: 320,
+              overflowY: 'auto',
+              border: '1px solid var(--affine-border-color)',
+              borderRadius: 8,
+              padding: 8,
+            }}
+          >
+            {isLoading && results.length === 0 ? (
+              <div style={{ padding: 16, textAlign: 'center' }}>Loading…</div>
+            ) : results.length > 0 ? (
+              results.map(m => {
+                const isSelf = m.id === currentUserId;
+                return (
+                  <label
+                    key={m.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '8px 6px',
+                      cursor: isSelf ? 'not-allowed' : 'pointer',
+                      opacity: isSelf ? 0.7 : 1,
+                    }}
+                    title={isSelf ? 'You always have access' : ''}
+                  >
+                    <input
+                      type="checkbox"
+                      style={checkboxStyle}
+                      checked={selectedUsers.has(m.id)}
+                      disabled={isSelf}
+                      onChange={() => toggleUser(m.id)}
+                    />
+                    <span>
+                      {m.name ?? m.email ?? m.id}
+                      {isSelf ? ' (you)' : ''}
+                    </span>
+                  </label>
+                );
+              })
+            ) : (
               <div
                 style={{
-                  fontSize: 12,
-                  color: 'var(--affine-text-secondary-color)',
+                  padding: 16,
                   textAlign: 'center',
-                  paddingTop: 8,
+                  color: 'var(--affine-text-secondary-color)',
+                  fontSize: 13,
                 }}
               >
-                Showing {pageMembers.length} of {memberCount}. Use the admin
-                Members panel to manage larger workspaces.
+                {searchInput.trim()
+                  ? `No members match "${searchInput.trim()}".`
+                  : 'No members loaded.'}
               </div>
             )}
+            {hasMore && results.length > 0 && (
+              <div style={{ paddingTop: 8, textAlign: 'center' }}>
+                <Button
+                  size="small"
+                  onClick={() => memberSearchService.loadMore()}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Loading…' : 'Load more'}
+                </Button>
+              </div>
+            )}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: 'var(--affine-text-secondary-color)',
+              marginTop: 6,
+            }}
+          >
+            {selectedUsers.size} selected
+          </div>
         </div>
       )}
 
