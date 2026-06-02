@@ -109,6 +109,33 @@ export const FolderShareDialog = ({
     return () => clearTimeout(handle);
   }, [open, searchInput, memberSearchService]);
 
+  // MOJO: keep paging members in while the dialog is open and we still
+  // have more — page size is 8, so a 30-person workspace lands in ~4
+  // round-trips. Without this the "Currently inheriting" pills could not
+  // resolve names for members past the first page and fell back to the
+  // uid prefix. Capped at 20 iterations so a buggy hasMore can't spin
+  // forever, but the natural end is hasMore$ flipping to false.
+  useEffect(() => {
+    if (!open) return;
+    let i = 0;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      if (i++ > 20) return;
+      if (memberSearchService.hasMore$.value) {
+        memberSearchService.loadMore();
+        // Give the result$ time to update before the next tick.
+        setTimeout(tick, 300);
+      }
+    };
+    // Wait until the initial search() call has had a chance to land.
+    const start = setTimeout(tick, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(start);
+    };
+  }, [open, memberSearchService]);
+
   const toggleUser = useCallback(
     (userId: string) => {
       setSelectedUsers(prev => {
@@ -145,16 +172,22 @@ export const FolderShareDialog = ({
       folder.setVisibility(serialized ?? '');
     }
 
-    // MOJO: bulk-cascade. Walk every descendant folder, and for the ones
-    // that look "default-private" (restricted-mode list with a single
-    // user id that's also their creator), flip them to inherit so the
-    // share automatically reaches them. Skip:
+    // MOJO: bulk-cascade. Walk every descendant folder and flip any
+    // 'restricted' subfolder to 'inherit' so the share automatically
+    // reaches them — regardless of who's currently in that subfolder's
+    // user list. We respect:
     //   - mode inherit (already cascading)
-    //   - mode public (intentionally world-visible)
-    //   - mode restricted with >1 user OR a user other than the creator
-    //     (looks like an explicit privacy choice; don't override it)
-    // Not applicable when the parent is also set to inherit (no anchor
-    // for the cascade) — checkbox is hidden in that case.
+    //   - mode public (intentionally world-visible; more permissive than
+    //     restricted — leave alone)
+    // Older heuristics tried to detect "default-private" subfolders by
+    // checking users.length === 1 && users[0] === createdBy, but that
+    // skipped (a) folders created before createdBy was stamped, and
+    // (b) folders where the dialog had been saved once and silently
+    // appended currentUserId, pushing users.length to 2. The result was
+    // the cascade silently doing nothing for the very folders the admin
+    // most wanted it to cover. Aggressive replacement is the explicit
+    // intent of checking the box; admins can manually re-restrict a
+    // subfolder afterwards if they need a more private branch.
     let converted = 0;
     if (cascadeToChildren && mode !== 'inherit') {
       const inheritJson = serializeVisibility({
@@ -166,14 +199,7 @@ export const FolderShareDialog = ({
           if (child.type$.value !== 'folder') continue;
           if (child.trashed$.value) continue;
           const v = parseVisibility(child.visibility$.value);
-          const childInfo = child.info$.value;
-          const creator = childInfo?.createdBy ?? null;
-          const looksDefault =
-            v.mode === 'restricted' &&
-            v.users.length === 1 &&
-            !!creator &&
-            v.users[0] === creator;
-          if (looksDefault && inheritJson) {
+          if (v.mode === 'restricted' && inheritJson) {
             child.setVisibility(inheritJson);
             converted++;
           }
@@ -187,7 +213,7 @@ export const FolderShareDialog = ({
             converted === 1 ? '' : 's'
           }`,
           message:
-            'Subfolders that were still private to their creator now inherit from this folder.',
+            'Subfolders now inherit visibility from this folder. Anyone with access here also sees them.',
         });
       }
     }
