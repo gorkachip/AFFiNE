@@ -1,6 +1,9 @@
 import { AuthService } from '@affine/core/modules/cloud';
 import { NotificationService } from '@affine/core/modules/notification';
-import { WorkspaceMembersService } from '@affine/core/modules/permissions';
+import {
+  MemberSearchService,
+  WorkspaceMembersService,
+} from '@affine/core/modules/permissions';
 import type { Member } from '@affine/core/modules/permissions/entities/members';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import type { DocMode } from '@affine/graphql';
@@ -167,11 +170,25 @@ export function useActivityLogPanel(
 ): UseActivityLogResult {
   const authService = useService(AuthService);
   const membersService = useService(WorkspaceMembersService);
+  const memberSearchService = useService(MemberSearchService);
   const workspaceService = useService(WorkspaceService);
   const notificationService = useService(NotificationService);
   const account = useLiveData(authService.session.account$);
   const rawMembers = useLiveData(membersService.members.pageMembers$);
-  const members = useMemo<Member[]>(() => rawMembers ?? [], [rawMembers]);
+  // MOJO: live, server-side search results — used when the user has an
+  // open @-mention dropdown. Lets us find members past page-0 (workspaces
+  // with > 8 collaborators) and matches by name OR email reliably.
+  const searchResults = useLiveData(memberSearchService.result$);
+  const members = useMemo<Member[]>(() => {
+    // Merge page-0 fetch + any search results, dedupe by id. This way the
+    // renderer (renderTextWithMentions / extractMentions) can find any
+    // member that ever appeared in either source, so old saved mentions
+    // keep rendering as styled tokens.
+    const map = new Map<string, Member>();
+    for (const m of rawMembers ?? []) map.set(m.id, m);
+    for (const m of searchResults) map.set(m.id, m);
+    return Array.from(map.values());
+  }, [rawMembers, searchResults]);
   const isCloud = workspaceService.workspace.flavour !== 'local';
 
   const notifyMentions = useCallback(
@@ -222,6 +239,19 @@ export function useActivityLogPanel(
   const [activeMentionIdx, setActiveMentionIdx] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // MOJO: debounce the @-mention dropdown query and fire a server-side
+  // member search. Empty string returns the first 8 workspace members,
+  // letting `@<Enter>` work as a "show me the team" picker even before
+  // the user types anything. Replaces the previous client-side filter
+  // over page-0 results, which broke once the workspace grew past 8.
+  useEffect(() => {
+    if (mentionQuery === null) return;
+    const handle = setTimeout(() => {
+      memberSearchService.search(mentionQuery);
+    }, 120);
+    return () => clearTimeout(handle);
+  }, [mentionQuery, memberSearchService]);
+
   const entryCount = useMemo(() => {
     return parsed.entries.reduce(
       (acc, e) => acc + 1 + (e.replies?.length ?? 0),
@@ -237,17 +267,22 @@ export function useActivityLogPanel(
       }`
     : 'No entries yet';
 
-  const filteredMembers = useMemo(() => {
+  // MOJO: dropdown candidates come from the server-side search results,
+  // not the page-0 cache. That fixes two issues: workspaces with > 8
+  // members were silently truncating, and any timing/cache gap left the
+  // dropdown empty. We still client-filter (defensive) and cap at 8.
+  const filteredMembers = useMemo<Member[]>(() => {
     if (mentionQuery === null) return [];
     const q = mentionQuery.toLowerCase();
-    return members
+    return searchResults
       .filter((m: Member) => {
+        if (q === '') return true;
         const name = (m.name ?? '').toLowerCase();
         const email = (m.email ?? '').toLowerCase();
         return name.includes(q) || email.includes(q);
       })
       .slice(0, 8);
-  }, [members, mentionQuery]);
+  }, [searchResults, mentionQuery]);
 
   const insertMention = useCallback(
     (member: { id: string; name?: string | null; email?: string | null }) => {
