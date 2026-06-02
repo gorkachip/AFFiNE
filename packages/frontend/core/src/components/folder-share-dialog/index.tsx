@@ -2,6 +2,7 @@ import { Button, Input, Modal, notify, RadioGroup } from '@affine/component';
 import { AuthService } from '@affine/core/modules/cloud';
 import type { FolderNode } from '@affine/core/modules/organize';
 import {
+  OrganizeService,
   parseVisibility,
   serializeVisibility,
 } from '@affine/core/modules/organize';
@@ -43,6 +44,7 @@ export const FolderShareDialog = ({
   onOpenChange,
 }: FolderShareDialogProps) => {
   const memberSearchService = useService(MemberSearchService);
+  const organizeService = useService(OrganizeService);
   const authService = useService(AuthService);
   const results = useLiveData(memberSearchService.result$);
   const hasMore = useLiveData(memberSearchService.hasMore$);
@@ -57,6 +59,14 @@ export const FolderShareDialog = ({
   // there's no parent — hide the option in that case.
   const folderInfo = useLiveData(folder.info$);
   const hasParent = folderInfo?.parentId != null;
+  // MOJO: EFFECTIVE visibility after walking up through any 'inherit'
+  // ancestors. Used to display who actually has access when this folder
+  // is in inherit mode — without it the dialog showed a 'restricted'
+  // subfolder as having no users, which is what the admin sees as
+  // "Rafli isn't checked" even though the cascade is working.
+  const effectiveVisibility = useLiveData(
+    organizeService.folderTree.effectiveVisibilityForFolder$(folder.id ?? '')
+  );
   const initial = useMemo(
     () => parseVisibility(visibilityRaw),
     [visibilityRaw]
@@ -226,9 +236,79 @@ export const FolderShareDialog = ({
             marginBottom: 16,
           }}
         >
-          This folder will be visible to whoever can see its parent folder.
-          Share the parent to add or remove people — changes cascade down
-          automatically.
+          <div>
+            This folder will be visible to whoever can see its parent
+            folder. Share the parent to add or remove people — changes
+            cascade down automatically.
+          </div>
+          {/* MOJO: show who effectively has access right now, resolved
+              from ancestors. Match each id against any member we've
+              already fetched (page-0 + any typed search hits); show the
+              id verbatim for ids we can't resolve so the admin still
+              knows the count is right. */}
+          <div
+            style={{
+              marginTop: 10,
+              paddingTop: 10,
+              borderTop: '1px solid var(--affine-border-color)',
+            }}
+          >
+            {effectiveVisibility.mode === 'public' ? (
+              <div style={{ color: 'var(--affine-text-primary-color)' }}>
+                Currently inheriting:{' '}
+                <strong>Visible to everyone in the workspace</strong>
+              </div>
+            ) : effectiveVisibility.users.length === 0 ? (
+              <div style={{ color: 'var(--affine-text-primary-color)' }}>
+                Currently inheriting:{' '}
+                <strong>Only workspace owners/admins</strong>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--affine-text-primary-color)' }}>
+                <div style={{ marginBottom: 6 }}>
+                  Currently inheriting access to{' '}
+                  <strong>
+                    {effectiveVisibility.users.length}{' '}
+                    {effectiveVisibility.users.length === 1
+                      ? 'person'
+                      : 'people'}
+                  </strong>
+                  :
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyle: 'none',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                  }}
+                >
+                  {effectiveVisibility.users.map(uid => {
+                    const m = results.find(r => r.id === uid);
+                    const label =
+                      m?.name ?? m?.email ?? uid.slice(0, 8) + '…';
+                    return (
+                      <li
+                        key={uid}
+                        style={{
+                          padding: '3px 10px',
+                          background:
+                            'var(--affine-background-overlay-panel-color)',
+                          borderRadius: 12,
+                          fontSize: 12,
+                        }}
+                      >
+                        {label}
+                        {uid === currentUserId ? ' (you)' : ''}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
