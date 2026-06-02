@@ -1,4 +1,4 @@
-import { Button, Input, Modal, RadioGroup } from '@affine/component';
+import { Button, Input, Modal, notify, RadioGroup } from '@affine/component';
 import { AuthService } from '@affine/core/modules/cloud';
 import type { FolderNode } from '@affine/core/modules/organize';
 import {
@@ -69,6 +69,12 @@ export const FolderShareDialog = ({
     new Set(initial.users)
   );
   const [searchInput, setSearchInput] = useState('');
+  // MOJO: when true (default), save also walks descendant folders and
+  // converts any that look "default-private" (restricted to a single
+  // creator id) to inherit, so the share cascades down through the
+  // pre-existing subfolders. Hidden when mode is 'inherit' (would be a
+  // no-op).
+  const [cascadeToChildren, setCascadeToChildren] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -128,8 +134,62 @@ export const FolderShareDialog = ({
       });
       folder.setVisibility(serialized ?? '');
     }
+
+    // MOJO: bulk-cascade. Walk every descendant folder, and for the ones
+    // that look "default-private" (restricted-mode list with a single
+    // user id that's also their creator), flip them to inherit so the
+    // share automatically reaches them. Skip:
+    //   - mode inherit (already cascading)
+    //   - mode public (intentionally world-visible)
+    //   - mode restricted with >1 user OR a user other than the creator
+    //     (looks like an explicit privacy choice; don't override it)
+    // Not applicable when the parent is also set to inherit (no anchor
+    // for the cascade) — checkbox is hidden in that case.
+    let converted = 0;
+    if (cascadeToChildren && mode !== 'inherit') {
+      const inheritJson = serializeVisibility({
+        mode: 'inherit',
+        users: [],
+      });
+      const walk = (n: FolderNode) => {
+        for (const child of n.children$.value) {
+          if (child.type$.value !== 'folder') continue;
+          if (child.trashed$.value) continue;
+          const v = parseVisibility(child.visibility$.value);
+          const childInfo = child.info$.value;
+          const creator = childInfo?.createdBy ?? null;
+          const looksDefault =
+            v.mode === 'restricted' &&
+            v.users.length === 1 &&
+            !!creator &&
+            v.users[0] === creator;
+          if (looksDefault && inheritJson) {
+            child.setVisibility(inheritJson);
+            converted++;
+          }
+          walk(child);
+        }
+      };
+      walk(folder);
+      if (converted > 0) {
+        notify.success({
+          title: `Cascaded share to ${converted} subfolder${
+            converted === 1 ? '' : 's'
+          }`,
+          message:
+            'Subfolders that were still private to their creator now inherit from this folder.',
+        });
+      }
+    }
     onOpenChange(false);
-  }, [folder, mode, onOpenChange, selectedUsers, currentUserId]);
+  }, [
+    folder,
+    mode,
+    onOpenChange,
+    selectedUsers,
+    currentUserId,
+    cascadeToChildren,
+  ]);
 
   return (
     <Modal
@@ -258,6 +318,46 @@ export const FolderShareDialog = ({
             {selectedUsers.size} selected
           </div>
         </div>
+      )}
+
+      {/* MOJO: cascade option is only meaningful when this folder defines
+          its own audience (public / restricted). When the folder itself
+          inherits, there's no anchor and the cascade is a no-op. */}
+      {mode !== 'inherit' && (
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 0',
+            cursor: 'pointer',
+            marginBottom: 12,
+            fontSize: 13,
+            color: 'var(--affine-text-primary-color)',
+          }}
+        >
+          <input
+            type="checkbox"
+            style={checkboxStyle}
+            checked={cascadeToChildren}
+            onChange={e => setCascadeToChildren(e.currentTarget.checked)}
+          />
+          <span>
+            Cascade access to all subfolders inside
+            <span
+              style={{
+                display: 'block',
+                fontSize: 11,
+                color: 'var(--affine-text-secondary-color)',
+                marginTop: 2,
+              }}
+            >
+              Existing subfolders that are still private to their creator
+              will be set to inherit from this folder. Subfolders explicitly
+              shared with other people are left untouched.
+            </span>
+          </span>
+        </label>
       )}
 
       <div
