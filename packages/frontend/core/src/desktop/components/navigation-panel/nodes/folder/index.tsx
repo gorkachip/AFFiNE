@@ -250,6 +250,9 @@ const NavigationPanelFolderNodeFolder = ({
   // locked, but an ancestor is). Used to hide the Lock/Unlock toggle —
   // you can't unlock a node you didn't lock; do it at the ancestor.
   const lockInherited = locked && ownLock === null;
+  // MOJO: workspace owners/admins bypass the lock entirely — they can
+  // rename, create, move, delete inside any locked folder without
+  // unlocking. The padlock badge still shows so they know it's locked.
   const createdBy = useLiveData(node.createdBy$);
   // MOJO: trashed folders are filtered out of the sidebar tree; they
   // surface in the dedicated Trash page instead.
@@ -260,6 +263,9 @@ const NavigationPanelFolderNodeFolder = ({
   const isOwnerOrAdmin = useLiveData(
     workspacePermissionService.permission.isOwnerOrAdmin$
   );
+  // MOJO: the gate the UI uses for hiding affordances — admins/owners
+  // bypass, so `enforceLock` is false for them even when `locked` is true.
+  const enforceLock = locked && !isOwnerOrAdmin;
   const visible = useMemo(() => {
     const v = parseVisibility(visibilityRaw);
     return canUserSeeFolder(v, currentUserId, !!isOwnerOrAdmin);
@@ -339,7 +345,7 @@ const NavigationPanelFolderNodeFolder = ({
   }, [isOwnerOrAdmin, ownLock, node, name, currentUserId]);
 
   const handleDelete = useCallback(() => {
-    if (locked) {
+    if (enforceLock) {
       notify.error({
         title: 'Folder is locked',
         message:
@@ -365,7 +371,7 @@ const NavigationPanelFolderNodeFolder = ({
       }),
       message: t['com.affine.rootAppSidebar.organize.delete.notify-message'](),
     });
-  }, [canManage, locked, name, node, t]);
+  }, [canManage, enforceLock, name, node, t]);
 
   const children = useLiveData(node.sortedChildren$);
 
@@ -829,9 +835,9 @@ const NavigationPanelFolderNodeFolder = ({
     // (or a workspace owner/admin) can rename / share / delete the
     // folder itself.
     return [
-      // MOJO: hide the inline "+" when the folder is locked (own or
-      // inherited) — adding content into it would just toast-fail.
-      ...(locked
+      // MOJO: hide the inline "+" when the folder is locked for THIS user
+      // (admins/owners bypass and keep adding content into locked folders).
+      ...(enforceLock
         ? []
         : [
             {
@@ -912,8 +918,9 @@ const NavigationPanelFolderNodeFolder = ({
             },
           ]
         : []),
-      // MOJO: hide all add-content entries under a lock (own or inherited).
-      ...(locked
+      // MOJO: hide add-content entries when the lock applies to THIS user
+      // (admins/owners bypass — they keep these affordances).
+      ...(enforceLock
         ? []
         : [
             {
@@ -1009,6 +1016,7 @@ const NavigationPanelFolderNodeFolder = ({
     canManage,
     isOwnerOrAdmin,
     locked,
+    enforceLock,
     lockInherited,
     ownLock,
     passthrough,
@@ -1029,7 +1037,9 @@ const NavigationPanelFolderNodeFolder = ({
       // "Remove from folder" items under a folder. Collaborators who did
       // not create the folder cannot mutate its contents. A locked
       // folder also hides the entry — admins must unlock first.
-      if (!canManage || locked) {
+      // Admins/owners bypass — they can remove items from inside locked
+      // folders without unlocking; regular creators still need to unlock.
+      if (!canManage || enforceLock) {
         return [] satisfies NodeOperation[];
       }
       if (type === 'doc' || type === 'collection' || type === 'tag') {
@@ -1052,7 +1062,7 @@ const NavigationPanelFolderNodeFolder = ({
       }
       return [];
     },
-    [canManage, locked, t]
+    [canManage, enforceLock, t]
   );
 
   const handleCollapsedChange = useCallback(
@@ -1080,23 +1090,25 @@ const NavigationPanelFolderNodeFolder = ({
         icon={NavigationPanelFolderIcon}
         name={name}
         dndData={dndData}
-        onDrop={canManage && !locked ? handleDropOnFolder : undefined}
+        onDrop={canManage && !enforceLock ? handleDropOnFolder : undefined}
         defaultRenaming={defaultRenaming}
-        renameable={canManage && !locked}
+        renameable={canManage && !enforceLock}
         extractEmojiAsIcon={enableEmojiIcon}
-        reorderable={canManage && !locked && reorderable}
+        reorderable={canManage && !enforceLock && reorderable}
         collapsed={collapsed}
         setCollapsed={handleCollapsedChange}
-        onRename={canManage && !locked ? handleRename : undefined}
+        onRename={canManage && !enforceLock ? handleRename : undefined}
         operations={finalOperations}
-        canDrop={canManage && !locked ? handleCanDrop : undefined}
+        canDrop={canManage && !enforceLock ? handleCanDrop : undefined}
         childrenPlaceholder={
           <FolderEmpty
-            canDrop={canManage && !locked ? handleCanDrop : undefined}
-            onDrop={canManage && !locked ? handleDropOnPlaceholder : undefined}
+            canDrop={canManage && !enforceLock ? handleCanDrop : undefined}
+            onDrop={
+              canManage && !enforceLock ? handleDropOnPlaceholder : undefined
+            }
           />
         }
-        dropEffect={canManage && !locked ? handleDropEffect : undefined}
+        dropEffect={canManage && !enforceLock ? handleDropEffect : undefined}
         data-testid={`navigation-panel-folder-${node.id}`}
         explorerIconConfig={node.id ? { where: 'folder', id: node.id } : null}
       >

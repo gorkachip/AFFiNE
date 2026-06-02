@@ -73,6 +73,10 @@ export const MojoAuthBridge = () => {
           const folderLocked =
             organizeService.folderTree.lockForDoc$(docId).value !== null;
           if (!folderLocked) return false;
+          // MOJO: workspace owners/admins bypass the lock — they can
+          // rename / trash / move docs inside locked folders without
+          // unlocking. Same rule as the folder-store guards.
+          if (isOwnerOrAdmin) return false;
           // Bypass: only an EXPLICIT per-user grant (Editor / Manager
           // / Owner) on this doc lifts the lock. Workspace default
           // role does NOT bypass — that's the whole point of the
@@ -95,7 +99,7 @@ export const MojoAuthBridge = () => {
     return () => {
       delete (globalThis as any).__mojoFolderLockChecker;
     };
-  }, [grantsCache, guardService, organizeService, userId]);
+  }, [grantsCache, guardService, organizeService, userId, isOwnerOrAdmin]);
 
   // Surface gate-blocked actions (silent framework deletes, kanban
   // row/column/view delete throws, etc.) as a user-visible toast. The

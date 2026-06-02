@@ -2,6 +2,18 @@ import { Store } from '@toeverything/infra';
 
 import type { WorkspaceDBService } from '../../db';
 
+// MOJO: workspace owners/admins bypass every folder-lock guard — they
+// can rename / create / move / delete content inside locked folders
+// without unlocking. The auth context is installed by MojoAuthBridge
+// at the workspace root; if it's not there yet (very early boot) we
+// fail closed and the guard still fires.
+function isAdminBypass(): boolean {
+  const ctx = (globalThis as any).__mojoAuthContext as
+    | { isOwnerOrAdmin?: boolean }
+    | undefined;
+  return !!ctx?.isOwnerOrAdmin;
+}
+
 export class FolderStore extends Store {
   constructor(private readonly dbService: WorkspaceDBService) {
     super();
@@ -64,12 +76,14 @@ export class FolderStore extends Store {
       throw new Error('Parent folder not found');
     }
     // MOJO: same rule as createFolder — no adding items into a locked
-    // folder (or anything below one).
-    const lockedAncestor = this.findLockedAncestor(parentId);
-    if (lockedAncestor) {
-      throw new Error(
-        'Cannot add items to a locked folder. Unlock the parent first (admins only).'
-      );
+    // folder (or anything below one). Workspace owners/admins bypass.
+    if (!isAdminBypass()) {
+      const lockedAncestor = this.findLockedAncestor(parentId);
+      if (lockedAncestor) {
+        throw new Error(
+          'Cannot add items to a locked folder. Unlock the parent first (admins only).'
+        );
+      }
     }
 
     this.dbService.db.folders.create({
@@ -90,17 +104,20 @@ export class FolderStore extends Store {
     }
     // MOJO: locked folders (or descendants of locked folders) cannot be
     // renamed. setLock itself bypasses by writing the `lock` field, not
-    // the data/name field, so the toggle keeps working.
-    if (node.lock) {
-      throw new Error(
-        'Folder is locked. Unlock it first to rename (admins only).'
-      );
-    }
-    const ancestorLocked = this.findLockedAncestor(nodeId);
-    if (ancestorLocked) {
-      throw new Error(
-        'Folder is inside a locked folder. Unlock the parent first (admins only).'
-      );
+    // the data/name field, so the toggle keeps working. Workspace
+    // owners/admins bypass entirely.
+    if (!isAdminBypass()) {
+      if (node.lock) {
+        throw new Error(
+          'Folder is locked. Unlock it first to rename (admins only).'
+        );
+      }
+      const ancestorLocked = this.findLockedAncestor(nodeId);
+      if (ancestorLocked) {
+        throw new Error(
+          'Folder is inside a locked folder. Unlock the parent first (admins only).'
+        );
+      }
     }
     this.dbService.db.folders.update(nodeId, {
       data: name,
@@ -122,11 +139,14 @@ export class FolderStore extends Store {
       // children inside it (nor inside any descendant of a locked
       // folder). findLockedAncestor walks from the parent up, so it
       // catches both the immediate parent and higher ancestors.
-      const lockedAncestor = this.findLockedAncestor(parentId);
-      if (lockedAncestor) {
-        throw new Error(
-          'Cannot create folder inside a locked folder. Unlock the parent first (admins only).'
-        );
+      // Workspace owners/admins bypass.
+      if (!isAdminBypass()) {
+        const lockedAncestor = this.findLockedAncestor(parentId);
+        if (lockedAncestor) {
+          throw new Error(
+            'Cannot create folder inside a locked folder. Unlock the parent first (admins only).'
+          );
+        }
       }
     }
 
@@ -180,17 +200,19 @@ export class FolderStore extends Store {
       throw new Error('Folder not found');
     }
     // MOJO: a locked folder (or any ancestor that's locked) cannot be
-    // trashed. Admins must unlock first.
-    if (info.lock) {
-      throw new Error(
-        'Folder is locked. Unlock it first (admins only).'
-      );
-    }
-    const ancestorLocked = this.findLockedAncestor(folderId);
-    if (ancestorLocked) {
-      throw new Error(
-        'Folder is inside a locked folder. Unlock the parent first (admins only).'
-      );
+    // trashed by regular users. Workspace owners/admins bypass.
+    if (!isAdminBypass()) {
+      if (info.lock) {
+        throw new Error(
+          'Folder is locked. Unlock it first (admins only).'
+        );
+      }
+      const ancestorLocked = this.findLockedAncestor(folderId);
+      if (ancestorLocked) {
+        throw new Error(
+          'Folder is inside a locked folder. Unlock the parent first (admins only).'
+        );
+      }
     }
     this.dbService.db.folders.update(folderId, {
       trashed: true,
@@ -222,19 +244,22 @@ export class FolderStore extends Store {
     // ancestor of the parent) is locked. For doc-links specifically,
     // a user with Doc_Users_Manage on the underlying doc bypasses
     // the lock — same rule as the editor read-only override.
-    const locked = this.findLockedAncestor(linkId);
-    if (locked) {
-      const checker = (globalThis as any).__mojoFolderLockChecker as
-        | { isDocLocked: (docId: string) => boolean }
-        | undefined;
-      const docId = link.type === 'doc' ? link.data : null;
-      const stillLocked = docId
-        ? (checker?.isDocLocked(docId) ?? true)
-        : true;
-      if (stillLocked) {
-        throw new Error(
-          'This item is inside a locked folder. Unlock the folder first (admins only).'
-        );
+    // Workspace owners/admins bypass entirely (admin > everything).
+    if (!isAdminBypass()) {
+      const locked = this.findLockedAncestor(linkId);
+      if (locked) {
+        const checker = (globalThis as any).__mojoFolderLockChecker as
+          | { isDocLocked: (docId: string) => boolean }
+          | undefined;
+        const docId = link.type === 'doc' ? link.data : null;
+        const stillLocked = docId
+          ? (checker?.isDocLocked(docId) ?? true)
+          : true;
+        if (stillLocked) {
+          throw new Error(
+            'This item is inside a locked folder. Unlock the folder first (admins only).'
+          );
+        }
       }
     }
     this.dbService.db.folders.delete(linkId);
@@ -326,24 +351,27 @@ export class FolderStore extends Store {
     // covers both "drag out of a locked folder" and "drop into a locked
     // folder", regardless of which UI path triggered it. For doc-links,
     // Doc_Users_Manage on the underlying doc bypasses both checks.
-    const checker = (globalThis as any).__mojoFolderLockChecker as
-      | { isDocLocked: (docId: string) => boolean }
-      | undefined;
-    const docIdForBypass = node.type === 'doc' ? node.data : null;
-    const isLinkBypassed =
-      !!docIdForBypass && checker?.isDocLocked(docIdForBypass) === false;
-    const sourceLocked = this.findLockedAncestor(nodeId);
-    if (sourceLocked && !isLinkBypassed) {
-      throw new Error(
-        'This item is inside a locked folder. Unlock the folder first (admins only).'
-      );
-    }
-    if (parentId) {
-      const targetLocked = this.findLockedAncestor(parentId);
-      if (targetLocked && !isLinkBypassed) {
+    // Workspace owners/admins bypass entirely.
+    if (!isAdminBypass()) {
+      const checker = (globalThis as any).__mojoFolderLockChecker as
+        | { isDocLocked: (docId: string) => boolean }
+        | undefined;
+      const docIdForBypass = node.type === 'doc' ? node.data : null;
+      const isLinkBypassed =
+        !!docIdForBypass && checker?.isDocLocked(docIdForBypass) === false;
+      const sourceLocked = this.findLockedAncestor(nodeId);
+      if (sourceLocked && !isLinkBypassed) {
         throw new Error(
-          'The destination folder is locked. Unlock it first (admins only).'
+          'This item is inside a locked folder. Unlock the folder first (admins only).'
         );
+      }
+      if (parentId) {
+        const targetLocked = this.findLockedAncestor(parentId);
+        if (targetLocked && !isLinkBypassed) {
+          throw new Error(
+            'The destination folder is locked. Unlock it first (admins only).'
+          );
+        }
       }
     }
 
